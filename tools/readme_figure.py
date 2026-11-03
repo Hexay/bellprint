@@ -33,7 +33,7 @@ BOUNDS = (-5.9, 1.9, 49.9, 55.9)  # lon/lat box: England and Wales
 # Keep in step with README.md's Accuracy table.
 FOOTER = (
     "Benchmarks (README, Accuracy): simulated, 200 random Dove rings: right tower first 50 %.  "
-    "Real recordings of 116 named towers: right tower first for 11."
+    "Real recordings of 141 named towers: right tower first for 17."
 )
 
 plt.rcParams.update({"font.family": ["Liberation Sans", "DejaVu Sans"], "text.color": INK})
