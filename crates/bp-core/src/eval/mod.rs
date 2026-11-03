@@ -1,7 +1,7 @@
 mod corpus;
 mod sim;
 
-pub use corpus::{CorpusEntry, eval_corpus, load_manifest, manifest_toml};
+pub use corpus::{CorpusEntry, eval_corpus, load_manifest, load_manifests, manifest_toml};
 pub use sim::{SimEvalConfig, eval_sim, pick_rings};
 
 use serde::Serialize;

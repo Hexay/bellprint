@@ -1,61 +1,47 @@
 # Real-recording benchmark corpus
 
-Real recordings of church bells, each tied to a Dove's Guide tower (`tower_id`) and ring (`ring_id`). Use them to
-benchmark bellprint's tower identification. The list lives in `manifest.toml`. Fetch the audio with:
+Real recordings of church bells, each tied to a Dove's Guide tower (`tower_id`) and ring (`ring_id`), for
+benchmarking tower identification. `eval-corpus` reads every `manifest*.toml` here and scores a recording once
+even if two manifests list the same URL. Fetch the audio with:
 
-    python3 -I tools/fetch_corpus.py [--only id,id] [--cookies cookies.txt]
+    python3 -I tools/fetch_corpus.py --manifest data/corpus/<manifest>.toml [--only id,id] [--cookies cookies.txt]
 
-Each recording is saved as mono 44.1 kHz FLAC at `audio/<id>.flac`, trimmed to `start_s`/`end_s` when they are set.
+Each recording is saved as mono 44.1 kHz FLAC at `audio/<id>.flac`, trimmed to `start_s`/`end_s` when set.
+**The audio is not redistributed**: `audio/` is gitignored and each user fetches it locally.
 
-## Sources and licences
+## Manifests
 
-- **archive.org**: 21 items, mostly Radio aporee sound-map field recordings, plus London Sound Survey (Southwark) and
-  Flickr video mirrors (Ballarat, Perth). Licences: CC-BY-SA-3.0, CC-BY-NC-3.0, CC-BY-NC-SA-3.0, PDM-1.0, CC-BY-2.0,
-  CC-BY-SA-2.0. `woolpit` has no licence stated.
-- **Freesound**: 22 sounds under CC0-1.0, CC-BY-3.0/4.0 or CC-BY-NC-3.0/4.0. The script fetches the public HQ preview
-  (128 kbps mp3), because original files need an API key.
-- **YouTube**: 17 videos under the standard YouTube licence.
+| File | Sources | How the tower is identified |
+|---|---|---|
+| `manifest.toml` | archive.org (mostly Radio Aporee), Freesound, YouTube | Title, description or tags name the church |
+| `manifest_commons_archive.toml` | archive.org | Item text names the church |
+| `manifest_geotagged.toml` | Radio Aporee (via its archive.org mirror), geotagged Freesound | Nearest Dove tower to the geotag (≤300 m, or ≤1 km if the text also names it) |
+| `manifest_web.toml` | BBC Sound Effects (RemArc licence, research use), SoundCloud, Vimeo | Title or catalogue text names the church |
 
-Each entry's `licence` field holds its exact licence. **The audio is not redistributed.** `audio/` is gitignored
-(`data/corpus/.gitignore`), so each user fetches it locally.
+Each entry's `licence` field holds its exact licence, and `identity_evidence` quotes the text or geotag used.
+Current counts by confidence, source and fetched audio:
+
+    for f in data/corpus/manifest*.toml; do python3 -I -c "import tomllib,sys,collections as c; r=tomllib.load(open(sys.argv[1],'rb'))['recording']; print(sys.argv[1], len(r), dict(c.Counter(x['confidence'] for x in r)))" $f; done
 
 ## Selection rules
 
-- Tower identity comes only from the title, description or tags naming the church or place, matched to Dove on place,
-  dedication and county. `identity_evidence` quotes that text.
-- The Dove `Hz`/`Note` columns and the `bells.csv` nominals were never read during selection or verification, so the
-  answer does not leak into the benchmark.
-- Confidence:
-  - `low`: more than one ring could be sounding, for example clock chimes that may use bells outside the Dove ring.
-  - `medium`: the identity is clear, but the recording has a caveat: it is distant, walk-past or edited, other towers
-    are nearby, or for YouTube the identity rests on the title alone.
-  - `high`: everything else.
-
-## Counts (high and medium only, 59 entries; low entries are excluded from benchmark totals)
-
-| | whole manifest | fetched here (42) |
-|---|---|---|
-| ringing | unknown 42, method 7, chiming 5, tolling 3, call_changes 1, mixed 1 | unknown 32, method 5, chiming 3, tolling 2 |
-| country | England 45, Ireland (island) 4, Australia 4, Wales 2, Scotland 2, USA 2 | England 36, Australia 3, Ireland 2, Wales 1 |
-| ring size | 3:2, 4:2, 5:1, 6:13, 8:23, 10:5, 12:11, 16:2 | 6:10, 8:17, 10:3, 12:10, 16:2 |
-
-Confidence across all 62 entries: high 29, medium 30, low 3 (`rothwell-clock`, `wells-cathedral-clock`,
-`york-minster-midday`).
+- Tower identity never comes from Dove's `Hz`/`Note` columns or the `bells.csv` nominals, which were not read
+  during selection or verification, so the answer does not leak into the benchmark.
+- Confidence: `low` when more than one ring could be sounding (clock chimes, carillons, nearby towers);
+  `medium` when the identity is clear but the recording has a caveat (distant, walk-past, edited, title-only);
+  `high` otherwise.
+- Sites' robots.txt is respected: BellBoard and Freesound search pages were not crawled, and aporee.org's map is
+  reached through its archive.org mirror.
 
 ## Known caveats
 
-- **YouTube is bot-walled from the build host.** Every video page returned "Sign in to confirm you're not a bot",
-  whatever the yt-dlp player client. The 17 YouTube entries therefore rest on the title alone: descriptions and
-  chapters were not checked, and every one is `medium`. To fetch them, rerun the script with `--cookies` pointing to a
-  cookies.txt exported from a signed-in browser. This gap is why no 3-, 4- or 5-bell rings, no Scotland or USA
-  entries, and no call-change entries have been fetched yet.
-- `ringing` is `unknown` for most field recordings, because the uploader did not say what was rung. Don't use it as
-  ground truth.
-- Some ring sizes differ from what is heard. `stepney-stedman` rings only the back 8 of 10, `alfriston` rings 5 of 6,
-  and `perth-swan-bells` is ringing up with an unknown subset of 16. Chiming and tolling entries sound one bell or a
-  few.
-- Several recordings are short or edited: `shirenewton` (13 s loop), `perth-swan-bells` (16 s) and `alfriston`
-  (loop cut). Others are distant or noisy (`crediton-distant`, `rode-distant`, `bristol-redcliffe`, `lyndhurst`).
-  In City of London and Oxford recordings, neighbouring towers may also be audible.
-- `exeter-cathedral-practice` is capped at the first 20 min of a 32 min practice, so it includes gaps between touches.
-- The two `ballarat-town-hall-*` entries are the same tower, recorded on different peal days.
+- **YouTube is bot-walled from the build host**, so its 17 entries in `manifest.toml` rest on the title alone and
+  have no audio here. Fetch them with `--cookies` and a cookies.txt from a signed-in browser. They hold the only
+  3-, 4- and 5-bell rings and the Scotland and USA entries.
+- `ringing` is `unknown` for most field recordings, because uploaders rarely say what was rung.
+- Some recordings ring a subset of the bells (`stepney-stedman` back 8 of 10, `alfriston` 5 of 6), are short or
+  looped (`shirenewton`, `perth-swan-bells`), distant, or in cities where neighbouring towers are audible.
+- `exeter-cathedral-practice` is capped at the first 20 min of a 32 min practice; `ap-worcester-remembrance`
+  runs 45 min.
+- Most of the 4,000-odd Aporee bell recordings are not tower ringing (clocks, shops, meditation bells); only
+  those within reach of a Dove tower were considered.

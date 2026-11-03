@@ -15,20 +15,32 @@ impl Lines {
         Self { cents: v.iter().map(|x| x.0).collect(), strength: v.iter().map(|x| x.1).collect() }
     }
 
-    /// Best `strength * gaussian(distance)` among lines within 3 sigma of `x`.
+    /// Best Gaussian pdf (per cent) of the offset to a line within 3 sigma of `x`, discounted only for
+    /// faint lines: real nominals are often just 10–12 dB above the floor.
     fn best_near(&self, x: f64, sigma: f64) -> f64 {
         let lo = self.cents.partition_point(|&c| c < x - 3.0 * sigma);
+        let norm = 1.0 / (sigma * std::f64::consts::TAU.sqrt());
         let mut best: f64 = 0.0;
         for i in lo..self.cents.len() {
             let d = self.cents[i] - x;
             if d > 3.0 * sigma {
                 break;
             }
-            best = best.max(self.strength[i] * (-0.5 * (d / sigma).powi(2)).exp());
+            let s = (self.strength[i] / 0.4).min(1.0);
+            best = best.max(s * norm * (-0.5 * (d / sigma).powi(2)).exp());
         }
         best
     }
+
+    /// Lines per cent within ±`half` cents of `x` (add-one smoothed): the rate of chance coincidences there.
+    fn density(&self, x: f64, half: f64) -> f64 {
+        let a = self.cents.partition_point(|&c| c < x - half);
+        let b = self.cents.partition_point(|&c| c <= x + half);
+        (b - a + 1) as f64 / (2.0 * half)
+    }
 }
+
+const DENSITY_HALF_CENTS: f64 = 300.0;
 
 /// A ring prepared for scoring: nominals and every predicted partial, in cents.
 pub(super) struct RingModel {
@@ -80,9 +92,11 @@ fn bell_terms(m: &RingModel, lines: &Lines, shift: f64, p: &MatchParams) -> (f64
     let mut total = 0.0;
     let mut heard = 0;
     for &n in &m.nominals {
-        let hit = lines.best_near(n + shift, p.nominal_sigma_cents);
-        heard += usize::from(hit > 0.5);
-        total += (1.0 - p.p_bell_heard + p.p_bell_heard * hit * p.hit_gain).ln();
+        let x = n + shift;
+        // A hit in a crowded spectrum is weak evidence; see MatchParams::p_bell_heard.
+        let lr = lines.best_near(x, p.nominal_sigma_cents) / lines.density(x, DENSITY_HALF_CENTS);
+        heard += usize::from(lr > 1.0);
+        total += (1.0 - p.p_bell_heard + p.p_bell_heard * lr).ln();
     }
     (total, heard)
 }

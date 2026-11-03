@@ -38,11 +38,16 @@ struct BellRow {
     nominal: Option<f64>,
 }
 
-fn reader(path: &Path) -> Result<csv::Reader<std::fs::File>> {
-    csv::ReaderBuilder::new()
-        .flexible(true)
-        .from_path(path)
-        .with_context(|| format!("opening {}", path.display()))
+fn reader(bytes: &[u8]) -> csv::Reader<&[u8]> {
+    csv::ReaderBuilder::new().flexible(true).from_reader(bytes)
+}
+
+pub(super) fn read_dir(dir: &Path) -> Result<(Vec<u8>, Vec<u8>)> {
+    let read = |name: &str| {
+        let p = dir.join(name);
+        std::fs::read(&p).with_context(|| format!("opening {}", p.display()))
+    };
+    Ok((read("dove.csv")?, read("bells.csv")?))
 }
 
 /// Ring bells have numeric roles ("1", "6b"); Sanctus, clock and disused bells are excluded.
@@ -56,9 +61,9 @@ fn leading_int(s: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
-fn nominals_by_ring(dir: &Path) -> Result<HashMap<u32, Vec<f64>>> {
+fn nominals_by_ring(bells_csv: &[u8]) -> HashMap<u32, Vec<f64>> {
     let mut out: HashMap<u32, Vec<f64>> = HashMap::new();
-    for row in reader(&dir.join("bells.csv"))?.deserialize::<BellRow>() {
+    for row in reader(bells_csv).deserialize::<BellRow>() {
         let Ok(row) = row else { continue };
         if let (Some(id), Some(hz)) = (row.ring_id, row.nominal)
             && is_ring_bell(&row.role)
@@ -67,13 +72,14 @@ fn nominals_by_ring(dir: &Path) -> Result<HashMap<u32, Vec<f64>>> {
             out.entry(id).or_default().push(hz);
         }
     }
-    Ok(out)
+    out
 }
 
-pub(super) fn load_rings(dir: &Path) -> Result<Vec<Ring>> {
-    let mut nominals = nominals_by_ring(dir)?;
+/// Rings from the bytes of Dove's `dove.csv` and `bells.csv`.
+pub(super) fn parse_rings(dove_csv: &[u8], bells_csv: &[u8]) -> Vec<Ring> {
+    let mut nominals = nominals_by_ring(bells_csv);
     let mut rings = Vec::new();
-    for row in reader(&dir.join("dove.csv"))?.deserialize::<DoveRow>() {
+    for row in reader(dove_csv).deserialize::<DoveRow>() {
         // Dove's CSV has a BOM and occasional odd rows; skip what doesn't parse.
         let Ok(row) = row else { continue };
         let (Some(lat), Some(lon)) = (row.lat, row.lon) else { continue };
@@ -100,5 +106,5 @@ pub(super) fn load_rings(dir: &Path) -> Result<Vec<Ring>> {
             nominals: hz,
         });
     }
-    Ok(rings)
+    rings
 }

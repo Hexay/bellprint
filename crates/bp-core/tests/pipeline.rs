@@ -1,14 +1,11 @@
 use bp_core::catalog::Catalog;
 use bp_core::locate::{LocateOptions, locate_audio, tower_rank};
 use bp_core::sim::{SimParams, simulate};
-use std::path::Path;
 use std::sync::OnceLock;
 
 fn catalog() -> &'static Catalog {
     static C: OnceLock<Catalog> = OnceLock::new();
-    C.get_or_init(|| {
-        Catalog::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/dove")).expect("data/dove present")
-    })
+    C.get_or_init(Catalog::embedded)
 }
 
 #[test]

@@ -6,18 +6,18 @@ use std::path::PathBuf;
 
 /// Rank towers for a recording; returns the report as a JSON string (the Python wrapper decodes it).
 #[pyfunction]
-#[pyo3(signature = (path, dove_dir, near=None, start=0.0, end=None, top=10))]
+#[pyo3(signature = (path, dove_dir=None, near=None, start=0.0, end=None, top=10))]
 fn locate_json(
     py: Python<'_>,
     path: PathBuf,
-    dove_dir: PathBuf,
+    dove_dir: Option<PathBuf>,
     near: Option<String>,
     start: f64,
     end: Option<f64>,
     top: usize,
 ) -> anyhow::Result<String> {
     py.detach(|| {
-        let catalog = Catalog::load(&dove_dir)?;
+        let catalog = Catalog::load_or_embedded(dove_dir.as_deref())?;
         let region = near.as_deref().map(Region::parse).transpose()?;
         let clip = bp_core::audio::Audio::load(&path)?.slice(start, end);
         let opts = LocateOptions { region, top, ..LocateOptions::default() };

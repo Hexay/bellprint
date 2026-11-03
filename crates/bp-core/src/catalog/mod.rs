@@ -27,6 +27,10 @@ impl Ring {
     }
 }
 
+// The data sits outside the crate dir; pyproject's maturin `include` puts it in the sdist.
+const EMBEDDED_DOVE: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/dove/dove.csv"));
+const EMBEDDED_BELLS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../data/dove/bells.csv"));
+
 pub struct Catalog {
     pub rings: Vec<Ring>,
 }
@@ -34,7 +38,18 @@ pub struct Catalog {
 impl Catalog {
     /// Loads `dove.csv` and `bells.csv` from `dir`; rings with no recorded nominal at all are dropped.
     pub fn load(dir: &Path) -> Result<Self> {
-        Ok(Self { rings: dove_csv::load_rings(dir)? })
+        let (dove, bells) = dove_csv::read_dir(dir)?;
+        Ok(Self { rings: dove_csv::parse_rings(&dove, &bells) })
+    }
+
+    /// The Dove snapshot compiled into the binary (data/dove, CC BY-SA 4.0; see data/dove/README.md).
+    pub fn embedded() -> Self {
+        Self { rings: dove_csv::parse_rings(EMBEDDED_DOVE, EMBEDDED_BELLS) }
+    }
+
+    /// `dir` if given, else the embedded snapshot.
+    pub fn load_or_embedded(dir: Option<&Path>) -> Result<Self> {
+        dir.map_or_else(|| Ok(Self::embedded()), Self::load)
     }
 
     pub fn ring(&self, ring_id: u32) -> Option<&Ring> {

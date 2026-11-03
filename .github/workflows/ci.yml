@@ -53,4 +53,4 @@ jobs:
           uv venv
           uvx maturin build --profile dev --out dist
           uv pip install dist/*.whl
-          uv run --no-project python -I -c "import bellprint, bellprint._core as c; print(c.locate_json.__name__)"
+          uv run --no-project python -I -c "import bellprint, bellprint._core as c; print(bellprint.__version__, c.locate_json.__name__)"

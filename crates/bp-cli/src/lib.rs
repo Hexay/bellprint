@@ -14,15 +14,18 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(name = "bellprint", about = "Identify the bell tower heard in a recording")]
 struct Cli {
-    /// Directory holding Dove's dove.csv and bells.csv.
-    #[arg(long, global = true, default_value = "data/dove")]
-    dove: PathBuf,
+    /// Directory with a newer Dove's dove.csv and bells.csv; defaults to the snapshot built in.
+    #[arg(long, global = true)]
+    dove: Option<PathBuf>,
     /// TOML overriding matcher parameters (fields of `MatchParams`).
     #[arg(long, global = true)]
     matcher: Option<PathBuf>,
     /// Line extraction: long_term | blows (experimental).
     #[arg(long, global = true, value_parser = parse_enum::<Extraction>, default_value = "long_term")]
     extraction: Extraction,
+    /// Analyse only the clip's most bell-like windows (experimental).
+    #[arg(long, global = true)]
+    auto_window: bool,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -94,7 +97,8 @@ enum Cmd {
     },
     /// Locate every recording in the real corpus.
     EvalCorpus {
-        #[arg(long, default_value = "data/corpus/manifest.toml")]
+        /// A manifest file, or a directory whose `manifest*.toml` files are all used.
+        #[arg(long, default_value = "data/corpus")]
         manifest: PathBuf,
         #[arg(long, default_value = "data/corpus/audio")]
         audio: PathBuf,
@@ -141,9 +145,14 @@ fn emit(title: &str, cases: &[Case], out: Option<PathBuf>) -> Result<()> {
 
 pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
     let cli = Cli::parse_from(args);
-    let catalog = Catalog::load(&cli.dove).context("loading Dove data (see --dove)")?;
+    let catalog = Catalog::load_or_embedded(cli.dove.as_deref()).context("loading Dove data (see --dove)")?;
     let matcher = match_params(cli.matcher.as_ref())?;
-    let base = LocateOptions { matcher, extraction: cli.extraction, ..LocateOptions::default() };
+    let base = LocateOptions {
+        matcher,
+        extraction: cli.extraction,
+        auto_window: cli.auto_window,
+        ..LocateOptions::default()
+    };
     let eval_opts = LocateOptions { top: 50, ..base.clone() };
     match cli.cmd {
         Cmd::Locate { audio, near, start, end, top, json } => {
@@ -184,6 +193,7 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
                 let (audio, _) = simulate(ring, &cfg.sim, s);
                 audio.write_wav(&out.join(format!("{id}.wav")))?;
                 entries.push(CorpusEntry {
+                    url: String::new(),
                     id,
                     tower_id: ring.tower_id,
                     ringing: format!("{:?}", cfg.sim.pattern).to_lowercase(),
@@ -195,7 +205,8 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
             println!("wrote {n} recordings to {}", out.display());
         }
         Cmd::EvalCorpus { manifest, audio, out } => {
-            let entries = eval::load_manifest(&manifest)?;
+            let entries =
+                if manifest.is_dir() { eval::load_manifests(&manifest)? } else { eval::load_manifest(&manifest)? };
             emit("Real corpus", &eval::eval_corpus(&catalog, &entries, &audio, &eval_opts), out)?;
         }
     }

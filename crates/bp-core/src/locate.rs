@@ -1,6 +1,7 @@
 use crate::audio::Audio;
 use crate::audio::blows::{BlowParams, struck_lines};
 use crate::audio::spectrum::{Peak, PeakParams, find_peaks};
+use crate::audio::window::{Window, WindowParams, concat, ringing_windows};
 use crate::catalog::Catalog;
 use crate::geo::Region;
 use crate::matcher::model::cents;
@@ -19,19 +20,40 @@ pub enum Extraction {
     Blows,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct LocateOptions {
     pub region: Option<Region>,
     pub extraction: Extraction,
+    /// Analyse only the most bell-like windows of long clips. Off by default: on the real corpus it
+    /// lost to the whole clip (8 vs 10 top-1 of 89).
+    pub auto_window: bool,
+    pub window: WindowParams,
     pub peaks: PeakParams,
     pub blows: BlowParams,
     pub matcher: MatchParams,
     pub top: usize,
 }
 
+impl Default for LocateOptions {
+    fn default() -> Self {
+        Self {
+            region: None,
+            extraction: Extraction::default(),
+            auto_window: false,
+            window: WindowParams::default(),
+            peaks: PeakParams::default(),
+            blows: BlowParams::default(),
+            matcher: MatchParams::default(),
+            top: 10,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Report {
     pub duration_s: f64,
+    /// Windows analysed; empty means the whole clip.
+    pub windows: Vec<Window>,
     pub region: Option<Region>,
     /// Extraction actually used (blows falls back to long-term when too few struck lines are found).
     pub extraction: Extraction,
@@ -72,9 +94,11 @@ pub fn extract_lines(audio: &Audio, o: &LocateOptions) -> (Vec<Peak>, Extraction
 }
 
 pub fn locate_audio(catalog: &Catalog, audio: &Audio, o: &LocateOptions) -> Report {
-    let (peaks, extraction, blows) = extract_lines(audio, o);
+    let windows = if o.auto_window { ringing_windows(audio, &o.window) } else { Vec::new() };
+    let clip = if windows.is_empty() { audio.clone() } else { concat(audio, &windows) };
+    let (peaks, extraction, blows) = extract_lines(&clip, o);
     let matches = rank_rings(catalog, &peaks, o.region.as_ref(), &o.matcher, o.top.max(1));
-    Report { duration_s: audio.duration_s(), region: o.region, extraction, blows, peaks, matches }
+    Report { duration_s: audio.duration_s(), windows, region: o.region, extraction, blows, peaks, matches }
 }
 
 /// 1-based rank of the first match in `tower_id`, if it made the list.

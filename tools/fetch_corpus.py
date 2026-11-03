@@ -51,14 +51,16 @@ def archive_file_url(page_url: str) -> str:
 
 def download(rec: dict, workdir: Path, cookies: Path | None) -> Path:
     src = rec['source']
-    if src == 'youtube':
+    # 'ytdlp' = any site yt-dlp supports (Vimeo, SoundCloud, ...); 'direct' = url is the media file itself.
+    if src in ('youtube', 'ytdlp'):
         cmd = ['yt-dlp', '-q', '--no-warnings', '--no-playlist', '-f', 'bestaudio/best',
                '-o', str(workdir / 'src.%(ext)s')]
         if cookies:
             cmd += ['--cookies', str(cookies)]
         subprocess.run(cmd + [rec['url']], check=True, capture_output=True, text=True)
         return next(workdir.glob('src.*'))
-    url = {'freesound': freesound_preview_url, 'archive': archive_file_url}[src](rec['url'])
+    resolve = {'freesound': freesound_preview_url, 'archive': archive_file_url, 'direct': lambda u: u}
+    url = resolve[src](rec['url'])
     dest = workdir / ('src' + Path(urllib.parse.urlparse(url).path).suffix)
     dest.write_bytes(http_get(url))
     return dest

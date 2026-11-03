@@ -5,14 +5,30 @@ build-backend = "maturin"
 [project]
 name = "bellprint"
 dynamic = ["version"]
-description = "Identify the bell tower heard in a recording from Dove's Guide bell frequencies"
+description = "Identify the church tower heard in a recording from its bells' pitches, matched against Dove's Guide"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-keywords = ["bells", "acoustics", "geolocation", "spectrogram"]
+license-files = ["LICENSE"]
+authors = [{ name = "Henry Alexander" }]
+keywords = ["bells", "acoustics", "geolocation", "spectrogram", "osint"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: Scientific/Engineering :: GIS",
+]
 dependencies = []
 
 [project.scripts]
 bellprint = "bellprint.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/Hexay/bellprint"
+Repository = "https://github.com/Hexay/bellprint"
+Issues = "https://github.com/Hexay/bellprint/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
@@ -22,3 +38,5 @@ manifest-path = "crates/bp-py/Cargo.toml"
 module-name = "bellprint._core"
 python-source = "python"
 features = ["pyo3/extension-module"]
+# bp-core embeds Dove's CSVs with include_bytes!; they sit outside the crate dirs.
+include = [{ path = "data/dove/*", format = "sdist" }]
