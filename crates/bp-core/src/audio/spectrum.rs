@@ -1,0 +1,129 @@
+use super::Audio;
+use realfft::RealFftPlanner;
+use serde::Serialize;
+
+/// A spectral line in the clip's long-term spectrum.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct Peak {
+    pub hz: f64,
+    /// dB above the local spectral floor.
+    pub prominence_db: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct PeakParams {
+    pub window_s: f64,
+    pub min_hz: f64,
+    pub max_hz: f64,
+    pub min_prominence_db: f64,
+    pub max_peaks: usize,
+    /// Half-width of the moving median that defines the floor.
+    pub floor_half_width_cents: f64,
+}
+
+impl Default for PeakParams {
+    fn default() -> Self {
+        Self {
+            window_s: 0.7,
+            min_hz: 60.0,
+            max_hz: 8000.0,
+            min_prominence_db: 6.0,
+            max_peaks: 80,
+            floor_half_width_cents: 150.0,
+        }
+    }
+}
+
+/// Hann-windowed, zero-padded power spectra of fixed-length segments.
+pub struct Fft {
+    win: usize,
+    plan: std::sync::Arc<dyn realfft::RealToComplex<f64>>,
+    hann: Vec<f64>,
+    input: Vec<f64>,
+    out: Vec<realfft::num_complex::Complex<f64>>,
+    pub bin_hz: f64,
+}
+
+impl Fft {
+    pub fn new(win: usize, pad: usize, sample_rate: u32) -> Self {
+        let n = pad.max(win);
+        let plan = RealFftPlanner::<f64>::new().plan_fft_forward(n);
+        let hann = (0..win).map(|i| (std::f64::consts::PI * i as f64 / win as f64).sin().powi(2)).collect();
+        let (input, out) = (plan.make_input_vec(), plan.make_output_vec());
+        Self { win, plan, hann, input, out, bin_hz: sample_rate as f64 / n as f64 }
+    }
+
+    /// Power spectrum of `samples[start..start + win]`; samples outside the slice count as zero.
+    pub fn power(&mut self, samples: &[f32], start: i64) -> Vec<f64> {
+        self.input.iter_mut().for_each(|x| *x = 0.0);
+        for i in 0..self.win {
+            let k = start + i as i64;
+            if k >= 0 && (k as usize) < samples.len() {
+                self.input[i] = samples[k as usize] as f64 * self.hann[i];
+            }
+        }
+        self.plan.process(&mut self.input, &mut self.out).expect("fft sizes match");
+        self.out.iter().map(|c| c.norm_sqr()).collect()
+    }
+}
+
+/// Welch mean power spectrum (Hann, 75 % overlap). Returns (power per bin, Hz per bin).
+pub fn mean_power(audio: &Audio, window_s: f64) -> (Vec<f64>, f64) {
+    let n = ((window_s * audio.sample_rate as f64) as usize).next_power_of_two();
+    let mut fft = Fft::new(n, n, audio.sample_rate);
+    let mut acc = vec![0.0; n / 2 + 1];
+    let mut frames = 0;
+    let mut start = 0;
+    loop {
+        for (a, p) in acc.iter_mut().zip(fft.power(&audio.samples, start as i64)) {
+            *a += p;
+        }
+        frames += 1;
+        start += n / 4;
+        if start + n > audio.samples.len() {
+            break;
+        }
+    }
+    acc.iter_mut().for_each(|a| *a /= frames as f64);
+    (acc, fft.bin_hz)
+}
+
+/// Sub-bin position of the peak at bin `k` by parabolic interpolation on dB.
+pub fn interp_bin(db: &[f64], k: usize) -> f64 {
+    let (a, b, c) = (db[k - 1], db[k], db[k + 1]);
+    let denom = a - 2.0 * b + c;
+    k as f64 + if denom.abs() > 1e-12 { 0.5 * (a - c) / denom } else { 0.0 }
+}
+
+fn floor_db(db: &[f64], k: usize, bin_hz: f64, half_cents: f64) -> f64 {
+    let f = k as f64 * bin_hz;
+    let r = 2f64.powf(half_cents / 1200.0);
+    let lo = ((f / r) / bin_hz) as usize;
+    let hi = (((f * r) / bin_hz).ceil() as usize).min(db.len() - 1);
+    let mut w: Vec<f64> = db[lo..=hi].to_vec();
+    let mid = w.len() / 2;
+    *w.select_nth_unstable_by(mid, f64::total_cmp).1
+}
+
+/// Prominent spectral lines, strongest first.
+pub fn find_peaks(audio: &Audio, p: &PeakParams) -> Vec<Peak> {
+    let (power, bin_hz) = mean_power(audio, p.window_s);
+    let db: Vec<f64> = power.iter().map(|x| 10.0 * (x + 1e-20).log10()).collect();
+    let lo = ((p.min_hz / bin_hz) as usize).max(3);
+    let hi = ((p.max_hz / bin_hz) as usize).min(db.len() - 3);
+    let mut peaks = Vec::new();
+    for k in lo..hi {
+        let v = db[k];
+        if !(v > db[k - 1] && v >= db[k + 1] && v > db[k - 2] && v >= db[k + 2]) {
+            continue;
+        }
+        let prom = v - floor_db(&db, k, bin_hz, p.floor_half_width_cents);
+        if prom < p.min_prominence_db {
+            continue;
+        }
+        peaks.push(Peak { hz: interp_bin(&db, k) * bin_hz, prominence_db: prom });
+    }
+    peaks.sort_by(|a, b| b.prominence_db.total_cmp(&a.prominence_db));
+    peaks.truncate(p.max_peaks);
+    peaks
+}

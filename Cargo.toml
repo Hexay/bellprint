@@ -1,0 +1,37 @@
+[workspace]
+resolver = "3"
+members = ["crates/bp-core", "crates/bp-cli", "crates/bp-py"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.90"
+
+[workspace.dependencies]
+bp-core = { path = "crates/bp-core" }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+rayon = "1.12"
+clap = { version = "4", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+
+# Eval/sweep iteration: release speed without LTO's slow link.
+[profile.fastrel]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.bp-core]
+opt-level = 3

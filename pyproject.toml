@@ -1,0 +1,24 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "bellprint"
+dynamic = ["version"]
+description = "Identify the bell tower heard in a recording from Dove's Guide bell frequencies"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["bells", "acoustics", "geolocation", "spectrogram"]
+dependencies = []
+
+[project.scripts]
+bellprint = "bellprint.__main__:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.maturin]
+manifest-path = "crates/bp-py/Cargo.toml"
+module-name = "bellprint._core"
+python-source = "python"
+features = ["pyo3/extension-module"]

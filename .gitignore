@@ -1,0 +1,12 @@
+/target/
+/runs/
+/data/corpus/audio/
+/data/sim/
+.venv/
+__pycache__/
+*.so
+*.wav
+*.mp3
+*.flac
+/.claude/
+/CLAUDE.md
