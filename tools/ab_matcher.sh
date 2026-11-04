@@ -17,8 +17,12 @@ trap restore EXIT
 restore; trap - EXIT
 
 for v in new old; do
-  sim="$("$OUT/$v/bellprint" eval-sim --n "$N" --seed 1 --out "$OUT/$v/sim" | sed -n 3p)"
-  corpus="$("$OUT/$v/bellprint" eval-corpus --out "$OUT/$v/corpus" | sed -n 3p)"
-  printf '%s sim:    %s\n%s corpus: %s\n' "$v" "$sim" "$v" "$corpus"
+  s=$SECONDS; sim="$("$OUT/$v/bellprint" eval-sim --n "$N" --seed 1 --out "$OUT/$v/sim" | sed -n 3p)"; ts=$((SECONDS - s))
+  s=$SECONDS; corpus="$("$OUT/$v/bellprint" eval-corpus --out "$OUT/$v/corpus" | sed -n 3p)"; tc=$((SECONDS - s))
+  printf '%s sim (%ss):    %s\n%s corpus (%ss): %s\n' "$v" "$ts" "$sim" "$v" "$tc" "$corpus"
+done
+# A pure speed-up must leave every case (ranks, probabilities) byte-identical, not just the summary.
+for k in sim corpus; do
+  cmp -s "$OUT/new/$k/cases.json" "$OUT/old/$k/cases.json" && echo "$k cases.json: identical" || echo "$k cases.json: DIFFER"
 done
 echo "$OUT"
