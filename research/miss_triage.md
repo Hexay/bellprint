@@ -1,96 +1,84 @@
-# Real-corpus miss triage (extraction vs matcher)
+# Real-corpus miss triage (start brief for the next rounds)
 
-Date 2026-11-04, binary at 956ee52 (mean long-term spectrum, 80-line cap). Corpus: all 141 recordings,
-top-1 17, so 124 misses. Every miss was triaged, not a sample.
+Date 2026-11-04, baseline main at b8ccc0d (Welch mean, 3 dB prominence, 120-line cap, shift core σc 6).
+Corpus 141 recordings, top-1/5/20 46/66/80, so **95 misses**. Every miss was triaged, none sampled.
 
 ## Method
 
-For each miss, `locate --json` with the cap lifted (`max_peaks = 400`, `min_prominence_db = 3`), then the
-first 80 lines (what the matcher saw) were checked against the true ring's Dove nominals:
+For each miss, the baseline binary's `locate --json --top 400` (400 = the full shortlist; its lines match
+`clips.json` exactly) against the true ring's Dove nominals (`bells.csv`, in-band ones only):
 
-- **present** = nominals with a line within ±8 c, at the best common shift within ±10 c of zero;
-- **null** = the same count with the nominals moved to ±450 or ±700 c (chance hits from a dense list);
-- **extraction miss** if present − null < 40 % of the bells; **matcher miss** if present ≥ 75 %.
-- Non-matcher rows were re-checked over shifts up to ±240 c against a null of jittered nominals
-  (`shifted-present`: old tapes and resampled uploads).
+- **net present** = true nominals within ±8 c of a line at the best shift within ±10 c, minus the same
+  count for the nominals moved ±450 / ±650 c (chance hits from the line list; 1–7 of a ring).
+- **share** = true nominals with a winner nominal within 12 c, each ring at its fitted shift.
+- **gap** = winner score − true score, when the true ring is in the 400-ring shortlist.
+- **near hint** = would the true tower rank first among candidates within 10 / 30 km of it (`--near`)?
 
-A dense line list makes chance hits common: at 80 lines the null is about a third of all nominals. Treat
-single-clip counts as ±1.
+Classes are exclusive and assigned in this order (first match wins):
 
-## Split (124 misses)
+| class | rule |
+|---|---|
+| A1 no Dove nominals | ≤ 1 nominal in `bells.csv` |
+| A2 chime / clock | `ringing = chiming` or a clock / chime note |
+| A3 ring changed / other tower | manifest note: Dove tuning or augmentation after the recording, recorded from another tower; or a tower ≤ 0.2 km away wins |
+| B2 partial ring | named subset beyond the subset rule (light 6 of 12, ringing up, 19-bell ring partly heard) |
+| C shift | true ring fitted ≥ 12 c from every known shift (outside 2σc of the core) |
+| B1 too little signal | net present < 40 % of in-band bells |
+| D near twin | signal present, share ≥ 75 % |
+| E other | signal present, share < 75 % |
 
-| class | n | meaning |
-|---|---|---|
-| matcher | 72 | ≥ 75 % of nominals are in the top 80 lines (median line rank 9–40), yet a wrong ring scores higher |
-| extraction | 39 | the nominals are not in the list at near-zero shift |
-| shifted-present | 6 | nominals present only at a large shift (York evening, Wakefield, South Lopham, …) |
-| no Dove nominals | 6 | ring has no `Nominal (Hz)` in bells.csv (askrigg, shirenewton, heckington, willesborough, wylam, marsh-gibbon) |
-| partial | 1 | bbc-oxton |
+## Split (95 misses)
 
-So most misses are **matcher** misses: the lines are there. Of the 39 extraction misses about half have
-causes no extraction can fix (clock chimes on bells outside Dove, rings retuned after the recording,
-recorded from the wrong tower, bells barely audible).
+| class | n | rank 2–5 / 6–50 / >50 | evidence | examples |
+|---|---|---|---|---|
+| D near twin | 32 | 16 / 12 / 4 | median share 100 %, median gap 1.2 nats, median margin 0.3; same bell count in 16 | witley-close, ia-croome, marsden-practice, woolpit, ballarat ×4 |
+| B1 too little signal | 20 | 2 / 1 / 17 | median net 1.4 of 8 bells (6–14); winners are small rings (fewer bells in 15) | southwark ×2, dorchester ×2, bridport, sevenoaks, carlisle, tewkesbury |
+| A2 chime / clock | 13 | 1 / 2 / 10 | a few bells struck repeatedly; 10 never shortlisted | wells-clock, ledbury-noon, rothwell-clock, totnes-6am |
+| A1 no Dove nominals | 10 | – / – / 10 | 6 rings with none, 4 with a single nominal | askrigg, wylam, marsh-gibbon, kensington, bolsover |
+| E other | 7 | 1 / 5 / 1 | share 33–70 %, median gap 2.8; 4 winners have fewer bells | stepney-stedman, bbc-oxton, sc-oxford-st-ebbe, bbc-winchester |
+| A3 ring changed / other tower | 6 | – / – / 6 | Magdalen (tuned 2011), St Albans (2010), Pembroke (2026), Rochdale (8 → 10), Canterbury (central tower), Oxford University Church (Lincoln College, 150 m, wins by 3.5 nats) | |
+| C shift | 4 | – / 1 / 3 | true ring at +15, −12.5, +25, −22.5 c; share 100 %, gap 3.4–6.2 nats | bbc-south-lopham, alfriston, bbc-brixham, bbc-westminster-abbey |
+| B2 partial ring | 3 | – / – / 3 | net 4–7 of 14–19 bells: a subset the matcher doesn't model | perth-swan-bells, dublin-christ-church, sc-wellington-cathedral |
 
-## Representative rows
+29 misses (A1–A3) can't be matched against this Dove snapshot: the attainable corpus top-1 is 112, so the
+baseline is 46 / 112 on matchable clips.
 
-present/null = nominals within ±8 c in the top 80 / chance level; rank = true tower's rank (eval keeps 50).
+## What would fix it, ranked by clips recoverable
 
-| id | type | s | lines | present/null | rank | class | cause |
-|---|---|---|---|---|---|---|---|
-| ia-march-st-wendreda | ? | 1200 | 165 | 6/6 / 1.8 | >50 | matcher | all 6 at 19–30 dB, rank ≤ 20; Barrow upon Humber wins |
-| ia-ballarat-pb-major-2 | method | 62 | 181 | 8/8 / 4.2 | >50 | matcher | all 8 within 6 c; Shoreditch at −20 c wins |
-| ballarat-town-hall-pbmajor | method | 60 | 226 | 8/8 / 3.8 | >50 | matcher | same tower, same failure |
-| woolpit | method | 307 | 177 | 5/5 / 1.8 | >50 | matcher | |
-| sc-willingdon | method | 1200 | 164 | 6/6 / 2.5 | >50 | matcher | |
-| sc-windsor-curfew-tower | method | 1200 | 170 | 8/8 / 3.5 | >50 | matcher | |
-| marsden-practice | ? | 297 | 210 | 10/10 / 4.0 | 47 | matcher | |
-| aston-cantlow | ? | 206 | 208 | 6/6 / 2.2 | 39 | matcher | camcorder |
-| sc-buckfast-abbey | method | 370 | 110 | 13/14 / 6.8 | >50 | matcher | |
-| ia-lincoln-cathedral-package | ? | 184 | 85 | 12/13 / 5.2 | >50 | matcher | speech over ringing, still found |
-| southwark-cathedral | ? | 120 | 183 | 1/13 / 3.0 | >50 | extraction | trains over Borough Market |
-| ia-southwark-borough-market | ? | 328 | 127 | 1/13 / 0.5 | >50 | extraction | trains, market |
-| stow-on-the-wold | ? | 91 | 119 | 2/8 / 2.0 | >50 | extraction | starlings in foreground |
-| lyndhurst | ? | 166 | 129 | 3/8 / 1.2 | >50 | extraction | birdsong, gunshots |
-| carlisle-cathedral | ? | 124 | 110 | 7/13 / 5.0 | >50 | extraction | wind distortion |
-| dorchester-abbey (+ia- copy) | ? | 450 | 137 | 2/8 / 1.8 | >50 | extraction | binaural; fetch downmixes to mono first |
-| edith-weston | ? | 63 | 230 | 3/6 / 1.0 | >50 | extraction | |
-| kinver-tolling | tolling | 29 | 225 | 3/8 / 1.8 | >50 | extraction | distant, one bell tolled |
-| bbc-sevenoaks | ? | 172 | 243 | 1/8 / 2.8 | >50 | extraction | old tape: best alignment at +228 c |
-| bbc-oxford-magdalen | method | 396 | 198 | 2/10 / 3.2 | >50 | extraction | Dove tuning 2011, after the recording |
-| bbc-st-albans-erin | method | 205 | 193 | 4/13 / 4.0 | >50 | extraction | Dove tuning 2010, after the recording |
-| bbc-canterbury-grandsire-cinques | mixed | 391 | 220 | 2/14 / 2.8 | >50 | extraction | recorded from the central tower |
-| ia-bridport-st-mary | ? | 315 | 9 | 0/8 / 0 | >50 | extraction | soundwalk away to a weir: 9 lines in all |
-| ia-inveraray-distant | ? | 34 | 16 | 4/10 / 1.8 | >50 | extraction | bells barely audible |
-| ap-dublin-johns-lane | ? | 360 | 22 | 0/10 / 0.5 | >50 | extraction | probably one Angelus bell |
-| wells-cathedral-clock | chiming | 82 | 163 | 1/10 / 1.5 | >50 | extraction | quarter bells not in Dove |
-| ia-ledbury-noon | chiming | 388 | 40 | 1/10 / 1.2 | >50 | extraction | clock chime |
-| ia-york-minster-evening | ? | 338 | 74 | 10/14 at shift | >50 | shifted | 20:30 chime, shifted alignment |
+Tested by `replay` on the baseline `clips.json` (corpus +gained / −lost top-1; sim s1 top-1 vs 144):
 
-## Patterns checked
+| # | fix | recoverable | evidence |
+|---|---|---|---|
+| 1 | **Location hint** (`--near`, or a geotag/metadata prior) | 40 top-1 at 30 km (D 30, E 4, A2 3, B1 2, C 1); 48 at 10 km | twins are rarely neighbours: 32 / 32 D clips rank first within 10 km. Nothing in the audio separates them at today's line precision. Report a `--near 30` benchmark alongside the no-hint one |
+| 2 | Noise-robust extraction on the 8 B1 clips with partial signal (net ≥ 30 %: tewkesbury, carlisle, wakefield, hereford, giggleswick, lyndhurst, edith-weston, port-sunlight-wedding) | ≤ 8 | the remaining 12 B1 clips are at chance (binaural Dorchester ×2, trains at Southwark ×2, bridport soundwalk, distant/one-bell clips); no line list can fix them |
+| 3 | Subset prior `subset_log_prior` −3 → −1.5 | +2 / −0 (stepney-stedman, ia-bournemouth) | sim s1 144 → 144; needs sim s2 before adopting |
+| 4 | `p_bell_heard` 0.7 → 0.5 | +3 / −1 | sim s1 142; borderline under the A/B rule |
+| 5 | Corpus labels: exclude or tag A1–A3 in the benchmark (report top-1 of 112 matchable) | 0 recovered, 29 removed from the denominator | data, not code |
+| 6 | Chime mode (score any 3–5 bell subset, no penalty for silent bells, when the clip is a strike/chime) | ≤ 3 (kirkbymoorside rank 5, norton-fitzwarren 14, wedmore 26) | the other 10 chimes never reach the shortlist: quarter bells outside the Dove ring |
 
-- **80-line cap.** 98 of 141 clips hit it, but lifting it does not help: present − null over all 141 clips
-  is 325 / 408 / 424 / 387 at the first 20 / 40 / 80 / all lines. Lines past 80 are mostly chance hits.
-- **Low-prominence nominals.** Where present, nominals sit at 11–30 dB and median rank 9–40; prominence is
-  not what loses them.
-- **Codec cutoffs.** Not a factor. Every clip except the near-silent ones (bridport, 267 Hz) has lines up to
-  2–8 kHz, and the misses' nominals are below 1.5 kHz.
-- **Speech, traffic, birds, wind.** The bulk of the fixable extraction misses (Southwark ×2, Stow, Lyndhurst,
-  Carlisle, Scarborough, Hereford). These sounds are loud only part of the time, which is what a per-bin
-  percentile across frames is for.
-- **Long clips (20 min).** Mostly matcher misses, not extraction: the nominals are present.
-- **Doublets / upper partials crowding.** No evidence: present nominals are within ±8 c (most ±3 c).
-- **Speed/tape shift.** 6 clips present only at ±60–230 c (BBC LPs, re-uploads). The matcher's shift prior
-  decides those.
-- **Stereo downmix.** `tools/fetch_corpus.py` uses `-ac 1`, so spaced or binaural pairs comb-filter before
-  bellprint sees them. This can't be fixed in bp-core without keeping both channels.
+Levers that recover **nothing** (corpus top-1 unchanged or worse):
 
-## Conclusions
+- Shift prior: core σc 4 (+0 / −0, sim 135), core weight 0.9 (+0 / −0, sim 138). C clips trail by 1.3–3.0
+  nats beyond their whole prior cost, so no prior closes them; earlier broad floors also failed
+  (matcher.md).
+- Longer subsets, `max_bells_dropped` 4 → 10: B2 clips stay outside the top 50.
+- Tighter `nominal_sigma_cents` 3.5 (+2 / −4), `true_harmonic_tol_cents` 6 (+1 / −1, sim 133),
+  `full_strength_db` 12 (+1 / −4), `background_share` 0.8 (+2 / −5), no line terms (+2 / −11, sim 77).
+- Large tape shifts: the previous round's "shifted-present" clips (Sevenoaks, Wakefield, Rochdale, York
+  evening) don't beat a null that is also maximised over ±260 c, so they are not shift misses.
 
-1. The matcher is the bottleneck: 72 of 124 misses have ≥ 75 % of the nominals in the list.
-2. Extraction work only pays on noisy clips. Robust aggregation (per-bin percentile) is the lever; changing
-   the cap or the prominence threshold is not.
-3. About 20 misses can't be fixed by either side (no Dove nominals, chimes outside the ring, retuned rings,
-   wrong tower). They put a ceiling on corpus top-1 well under 141.
+## Confidence of misses
 
-Regenerate: the triage scripts live outside the repo; the procedure above is what they did, using
-`bellprint locate --json --peaks <toml>` and Dove `bells.csv`.
+The report's confidence label (matcher_twins.md, "Confidence label") puts 76 of the 95 misses at low, 14 at
+medium and 5 at high. Four of the five high-confidence misses are A2/A3: a different ring really is
+sounding (Oxford University Church vs Lincoln College, Canterbury from the central tower, St Albans and
+Rothwell); the fifth is bbc-winchester (E, rank 10).
+
+## Earlier triage
+
+The 956ee52 triage (17 / 141 top-1, extraction vs matcher split, 72 matcher / 39 extraction) is superseded
+by the classes above; see `git log -p research/miss_triage.md` before 2026-11-04.
+
+Regenerate: `tools/triage/locate_misses.sh <bin> <cases.json> <out>` writes the per-miss dumps;
+`python3 -I tools/triage/triage.py`, `classify.py` (class rules, incl. the hand-set A3 / B2 lists),
+`near.py` and `levers.py` (on `replay --out` dirs) print the tables.
