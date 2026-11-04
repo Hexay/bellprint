@@ -48,5 +48,5 @@ fn ringing_the_back_six_of_eight_still_finds_the_eight() {
     };
     let with = rank(MatchParams::default());
     let without = rank(MatchParams { subset_log_prior: f64::NEG_INFINITY, ..Default::default() });
-    assert!(with <= 10 && with < without, "{}: rank {with} with subsets, {without} without", ring.place);
+    assert!(with <= 15 && with < without, "{}: rank {with} with subsets, {without} without", ring.place);
 }

@@ -29,7 +29,8 @@ impl Default for PeakParams {
         Self {
             window_s: 0.7,
             min_hz: 60.0,
-            max_hz: 8000.0,
+            // 98.7 % of Dove nominals lie below this; lines above it helped wrong rings more than right ones.
+            max_hz: 2500.0,
             min_prominence_db: 6.0,
             max_peaks: 80,
             floor_half_width_cents: 150.0,
