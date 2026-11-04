@@ -67,8 +67,8 @@ that rise when a bell strikes) and `--auto-window` (analyse only the most bell-l
 
 | Benchmark | Setup | Right tower first | In top 5 |
 |---|---|---|---|
-| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **72 %** | 89 % |
-| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **45 / 141** | 66 / 141 |
+| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **72 %** | 88 % |
+| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **46 / 141** | 66 / 141 |
 
 - The simulator shares no code or constants with the matcher's bell model, but it is kinder than reality: no
   reverb, no automatic gain control, and ringing for the whole clip.
