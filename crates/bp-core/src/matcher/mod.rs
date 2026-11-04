@@ -41,15 +41,17 @@ fn score_ring_or_subset(ring: &Ring, lines: &Lines, p: &MatchParams, grid: &[(f6
     best
 }
 
-/// Ranks catalog rings by how well they explain `peaks`, best first. `region` restricts the candidates.
+/// Ranks catalog rings by how well they explain `peaks`, found in `band_hz`, best first. `region`
+/// restricts the candidates.
 pub fn rank_rings(
     catalog: &Catalog,
     peaks: &[Peak],
+    band_hz: (f64, f64),
     region: Option<&Region>,
     p: &MatchParams,
     top: usize,
 ) -> Vec<Match> {
-    let lines = Lines::from_peaks(peaks, p.full_strength_db);
+    let lines = Lines::from_peaks(peaks, p.full_strength_db, band_hz);
     let grid = model::shift_grid(p);
     let candidates: Vec<&Ring> =
         catalog.rings.iter().filter(|r| region.is_none_or(|g| g.contains(r.lat, r.lon))).collect();

@@ -35,6 +35,22 @@ fn clean_sim_ranks_its_own_tower_first() {
     assert_eq!(tower_rank(&report, ring.tower_id), Some(1), "top: {:?}", top_place(&report));
 }
 
+/// Trebles above the analysed band can't be heard and must not count as missed.
+#[test]
+fn light_ring_with_trebles_above_the_band_still_ranks() {
+    let c = catalog();
+    let max_hz = LocateOptions::default().peaks.max_hz;
+    let ring = c
+        .rings
+        .iter()
+        .find(|r| r.nominals.len() >= 6 && r.complete() && r.nominals[0] > max_hz * 1.05 && r.nominals[2] < max_hz)
+        .unwrap();
+    let (audio, _) = simulate(ring, &clean(), 7);
+    let report = locate_audio(c, &audio, &LocateOptions { top: 20, ..Default::default() });
+    let rank = tower_rank(&report, ring.tower_id);
+    assert!(rank.is_some_and(|r| r <= 3), "{} {:?}: rank {rank:?}", ring.place, ring.nominals);
+}
+
 /// The back 6 of a common 8 is shared by many 6-bell rings, so only a clear rise is asked for.
 #[test]
 fn ringing_the_back_six_of_eight_still_finds_the_eight() {

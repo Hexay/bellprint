@@ -5,6 +5,8 @@ use crate::audio::spectrum::Peak;
 pub(super) struct Lines {
     cents: Vec<f64>,
     strength: Vec<f64>,
+    /// Analysed band in cents; nothing outside it could have been seen.
+    band: (f64, f64),
 }
 
 /// `v.partition_point(pred)` found by scanning up from `from`, which must not be past it: a cursor for
@@ -17,11 +19,15 @@ fn advance<T>(v: &[T], mut from: usize, pred: impl Fn(&T) -> bool) -> usize {
 }
 
 impl Lines {
-    pub fn from_peaks(peaks: &[Peak], full_strength_db: f64) -> Self {
+    pub fn from_peaks(peaks: &[Peak], full_strength_db: f64, band_hz: (f64, f64)) -> Self {
         let mut v: Vec<(f64, f64)> =
             peaks.iter().map(|p| (cents(p.hz), (p.prominence_db / full_strength_db).min(1.0))).collect();
         v.sort_by(|a, b| a.0.total_cmp(&b.0));
-        Self { cents: v.iter().map(|x| x.0).collect(), strength: v.iter().map(|x| x.1).collect() }
+        Self {
+            cents: v.iter().map(|x| x.0).collect(),
+            strength: v.iter().map(|x| x.1).collect(),
+            band: (cents(band_hz.0), cents(band_hz.1)),
+        }
     }
 
     /// Best Gaussian pdf (per cent) of the offset to a line within 3 sigma of `x`, discounted only for
@@ -113,6 +119,10 @@ fn bell_terms(m: &RingModel, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams
             }
             prev = shift;
             let x = n + shift;
+            // Out of band the bell is unobservable, not missed: charging it would sink light rings.
+            if x < lines.band.0 || x > lines.band.1 {
+                continue;
+            }
             near = advance(&lines.cents, near, |&c| c < x - 3.0 * sigma);
             let best = lines.best_near(near, x, sigma);
             if best == 0.0 {

@@ -97,7 +97,11 @@ pub fn locate_audio(catalog: &Catalog, audio: &Audio, o: &LocateOptions) -> Repo
     let windows = if o.auto_window { ringing_windows(audio, &o.window) } else { Vec::new() };
     let clip = if windows.is_empty() { audio.clone() } else { concat(audio, &windows) };
     let (peaks, extraction, blows) = extract_lines(&clip, o);
-    let matches = rank_rings(catalog, &peaks, o.region.as_ref(), &o.matcher, o.top.max(1));
+    let band = match extraction {
+        Extraction::LongTerm => (o.peaks.min_hz, o.peaks.max_hz),
+        Extraction::Blows => (o.blows.min_hz, o.blows.max_hz),
+    };
+    let matches = rank_rings(catalog, &peaks, band, o.region.as_ref(), &o.matcher, o.top.max(1));
     Report { duration_s: audio.duration_s(), windows, region: o.region, extraction, blows, peaks, matches }
 }
 
