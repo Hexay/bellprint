@@ -1,5 +1,4 @@
-use super::Case;
-use super::sim::case;
+use super::{Case, Clip};
 use crate::audio::Audio;
 use crate::catalog::Catalog;
 use crate::locate::{LocateOptions, locate_audio};
@@ -62,14 +61,15 @@ pub fn eval_corpus(
     entries: &[CorpusEntry],
     audio_dir: &Path,
     opts: &LocateOptions,
-) -> Vec<Case> {
+) -> Vec<(Case, Clip)> {
     entries
         .par_iter()
         .filter_map(|e| {
             let audio = Audio::load(&audio_dir.join(format!("{}.flac", e.id))).ok()?;
             let report = locate_audio(catalog, &audio, opts);
             let note = format!("{} {} {:.0}s", e.ringing, e.confidence, audio.duration_s());
-            Some(case(e.id.clone(), e.tower_id, e.bells as usize, &report, note))
+            let clip = Clip::new(e.id.clone(), e.tower_id, e.bells as usize, &report, note);
+            Some((clip.case(&report.matches), clip))
         })
         .collect()
 }

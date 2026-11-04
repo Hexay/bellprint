@@ -58,6 +58,8 @@ pub struct Report {
     /// Extraction actually used (blows falls back to long-term when too few struck lines are found).
     pub extraction: Extraction,
     pub blows: usize,
+    /// Band the lines were searched in.
+    pub band_hz: (f64, f64),
     pub peaks: Vec<Peak>,
     pub matches: Vec<Match>,
 }
@@ -102,10 +104,14 @@ pub fn locate_audio(catalog: &Catalog, audio: &Audio, o: &LocateOptions) -> Repo
         Extraction::Blows => (o.blows.min_hz, o.blows.max_hz),
     };
     let matches = rank_rings(catalog, &peaks, band, o.region.as_ref(), &o.matcher, o.top.max(1));
-    Report { duration_s: audio.duration_s(), windows, region: o.region, extraction, blows, peaks, matches }
+    Report { duration_s: audio.duration_s(), windows, region: o.region, extraction, blows, band_hz: band, peaks, matches }
 }
 
 /// 1-based rank of the first match in `tower_id`, if it made the list.
 pub fn tower_rank(report: &Report, tower_id: u32) -> Option<usize> {
-    report.matches.iter().position(|m| m.ring.tower_id == tower_id).map(|i| i + 1)
+    rank_of(&report.matches, tower_id)
+}
+
+pub fn rank_of(matches: &[Match], tower_id: u32) -> Option<usize> {
+    matches.iter().position(|m| m.ring.tower_id == tower_id).map(|i| i + 1)
 }

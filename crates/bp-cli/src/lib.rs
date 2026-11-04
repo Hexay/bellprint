@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use bp_core::audio::spectrum::PeakParams;
 use bp_core::catalog::Catalog;
-use bp_core::eval::{self, Case, CorpusEntry, SimEvalConfig};
+use bp_core::eval::{self, Case, Clip, CorpusEntry, SimEvalConfig};
 use bp_core::geo::Region;
 use bp_core::locate::{Extraction, LocateOptions, locate_audio};
 use bp_core::matcher::MatchParams;
@@ -109,6 +109,12 @@ enum Cmd {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Re-rank the lines an eval saved (`<out>/clips.json`) with the current matcher, without audio.
+    Replay {
+        clips: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
 }
 
 fn parse_enum<T: serde::de::DeserializeOwned>(s: &str) -> Result<T, String> {
@@ -131,7 +137,8 @@ fn toml_params<T: Default + serde::de::DeserializeOwned>(path: Option<&PathBuf>)
     Ok(toml::from_str(&text)?)
 }
 
-fn emit(title: &str, cases: &[Case], out: Option<PathBuf>) -> Result<()> {
+/// Writes the summary, and with `out` the cases and (if given) the clips' lines for `replay`.
+fn emit(title: &str, cases: &[Case], clips: Option<&[Clip]>, out: Option<PathBuf>) -> Result<()> {
     let summary = eval::summarize(cases);
     let md = eval::markdown(title, &summary, cases);
     match out {
@@ -139,6 +146,9 @@ fn emit(title: &str, cases: &[Case], out: Option<PathBuf>) -> Result<()> {
             std::fs::create_dir_all(&dir)?;
             std::fs::write(dir.join("summary.md"), &md)?;
             std::fs::write(dir.join("cases.json"), serde_json::to_string_pretty(cases)?)?;
+            if let Some(clips) = clips {
+                std::fs::write(dir.join("clips.json"), serde_json::to_string(clips)?)?;
+            }
             println!("{}", md.lines().take(3).collect::<Vec<_>>().join("\n"));
             println!("wrote {}", dir.display());
         }
@@ -186,7 +196,8 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
         }
         Cmd::EvalSim { n, seed, country, min_bells, out, sim } => {
             let cfg = SimEvalConfig { n, seed, sim: sim_params(&sim), complete_only: true, min_bells, country };
-            emit("Simulated recordings", &eval::eval_sim(&catalog, &cfg, &eval_opts), out)?;
+            let (cases, clips): (Vec<_>, Vec<_>) = eval::eval_sim(&catalog, &cfg, &eval_opts).into_iter().unzip();
+            emit("Simulated recordings", &cases, Some(&clips), out)?;
         }
         Cmd::SimBatch { n, seed, out, sim } => {
             let cfg = SimEvalConfig { n, seed, sim: sim_params(&sim), complete_only: true, min_bells: 3, country: None };
@@ -211,7 +222,14 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
         Cmd::EvalCorpus { manifest, audio, out } => {
             let entries =
                 if manifest.is_dir() { eval::load_manifests(&manifest)? } else { eval::load_manifest(&manifest)? };
-            emit("Real corpus", &eval::eval_corpus(&catalog, &entries, &audio, &eval_opts), out)?;
+            let (cases, clips): (Vec<_>, Vec<_>) =
+                eval::eval_corpus(&catalog, &entries, &audio, &eval_opts).into_iter().unzip();
+            emit("Real corpus", &cases, Some(&clips), out)?;
+        }
+        Cmd::Replay { clips, out } => {
+            let text = std::fs::read_to_string(&clips).with_context(|| format!("reading {}", clips.display()))?;
+            let clips: Vec<Clip> = serde_json::from_str(&text)?;
+            emit("Replay", &eval::replay(&catalog, &clips, &eval_opts), None, out)?;
         }
     }
     Ok(())

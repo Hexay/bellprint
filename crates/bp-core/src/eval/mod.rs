@@ -1,7 +1,9 @@
 mod corpus;
+mod replay;
 mod sim;
 
 pub use corpus::{CorpusEntry, eval_corpus, load_manifest, load_manifests, manifest_toml};
+pub use replay::{Clip, replay};
 pub use sim::{SimEvalConfig, eval_sim, pick_rings};
 
 use serde::Serialize;

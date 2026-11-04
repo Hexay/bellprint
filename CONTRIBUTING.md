@@ -17,6 +17,7 @@ Needs Rust ≥ 1.90 and, for the Python package, Python ≥ 3.11 with [uv](https
 | `tools/sweep.sh experiments/x.toml[:blows\|:long_term] -- --n 200` | simulated A/B → `runs/<ts>-sweep/` |
 | `tools/dev.sh corpus-eval` | real-recording benchmark → `runs/<ts>-corpus/summary.md` |
 | `tools/sim_codec.sh [n] [seed]` | simulated recordings through MP3/AAC/Opus, scored per codec |
+| `bellprint [--matcher x.toml] replay <eval out>/clips.json` | re-rank an eval's saved lines without audio (matcher A/B in seconds) |
 
 The real corpus is listed in `data/corpus/manifest.toml`; fetch its audio with
 `python3 -I tools/fetch_corpus.py` (needs yt-dlp and ffmpeg). The audio is not redistributed. A change that
