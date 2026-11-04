@@ -19,6 +19,7 @@ pub struct Case {
     pub top_tower_id: Option<u32>,
     pub top_place: String,
     pub top_probability: f64,
+    pub top_margin: f64,
     pub peaks: usize,
     pub note: String,
 }

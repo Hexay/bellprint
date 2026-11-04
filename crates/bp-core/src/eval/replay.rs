@@ -39,6 +39,7 @@ impl Clip {
             top_tower_id: top.map(|m| m.ring.tower_id),
             top_place: top.map_or(String::new(), |m| format!("{} ({})", m.ring.place, m.ring.dedication)),
             top_probability: top.map_or(0.0, |m| m.probability),
+            top_margin: top.map_or(0.0, |m| m.margin),
             peaks: self.lines.len(),
             note: self.note.clone(),
         }
