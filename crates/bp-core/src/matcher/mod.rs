@@ -26,12 +26,12 @@ pub struct Match {
 /// Best score of the whole ring or of any contiguous run of it that drops up to `max_bells_dropped`
 /// bells from the front or back, each run charged `subset_log_prior`.
 fn score_ring_or_subset(ring: &Ring, lines: &Lines, p: &MatchParams, grid: &[(f64, f64)], full: bool) -> RingScore {
-    let hz = &ring.nominals;
+    let (hz, years) = (&ring.nominals, &ring.cast_years);
     let n = hz.len();
-    let mut best = score_ring(&RingModel::new(hz, p), lines, p, grid, full);
+    let mut best = score_ring(&RingModel::new(hz, years, p), lines, p, grid, full);
     for d in 1..=p.max_bells_dropped.min(n.saturating_sub(p.min_subset_bells)) {
-        for run in [&hz[d..], &hz[..n - d]] {
-            let mut s = score_ring(&RingModel::new(run, p), lines, p, grid, full);
+        for (run, run_years) in [(&hz[d..], &years[d..]), (&hz[..n - d], &years[..n - d])] {
+            let mut s = score_ring(&RingModel::new(run, run_years, p), lines, p, grid, full);
             s.score += p.subset_log_prior;
             if s.score > best.score {
                 best = s;

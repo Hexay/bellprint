@@ -30,11 +30,49 @@ Bands often ring the back 8 of 10 or 12, or 6 of 8. `score_ring_or_subset` also 
 run that drops up to 4 bells from the front or back (keeping ≥ 5), charged `subset_log_prior` = −3. Sim
 rings are complete, so sim is neutral to it; on the corpus it adds top-1 and top-5 (`experiments/no_subsets.toml`).
 
+## Remaining misses (2.5 kHz band, 4 dB lines, 113 misses)
+Per-miss decomposition (true ring vs winner at their best shifts) over the 64 misses with ≥ 75 % of true
+nominals within 8 c of a line:
+- The gap is in the nominal terms, not the lines: winners score about 1.4 nats per bell, as the true ring
+  does, and win by having more bells (10–16 against 6–8). Strong lines left unexplained by the true ring are
+  rare outside 1–3 bell "rings".
+- Winners' nominals land on the true ring's **primes** (strongest, 19.6 dB median), quints and tierces.
+  Primes and nominals form the same scale an octave apart, which a 12–16 bell ring in a related key covers.
+- Lines are not dense (40–80): a nominal at a random position hits a line 12 % of the time, the winners' 100 %.
+- Prominence doesn't separate nominals: in the 75th-percentile spectrum, hum, prime and tierce lines
+  (median 14.5–14.8 dB) are stronger than nominal lines (12.4 dB).
+- Per-bell partial presence doesn't separate them either: winners' heard bells show a tierce/superquint
+  /octave nominal within tolerance as often as the true ring's (0.75/0.86/0.93 vs 0.76/0.89/0.92; null
+  0.25/0.66/0.78).
+- No ring-level coherence of partial offsets: the spread of per-ring mean offsets (hum 24, prime 15 c) is
+  the same as that of control ratios (18–23 c).
+- **Era does separate them.** Offsets by Dove cast year: from 1926 hum IQR −3…+5 c and prime −3…+4
+  (87 %/93 % within 20 c); 1896–1925 72 %/69 %; before 1896 near the control level (23–53 %). The
+  all-era hum and prime tolerances (40, 30 c) were 3–4× too wide for modern rings. That let a bigger ring's
+  5 c nominals claim the true primes.
+
+## Era tolerances
+Hum and prime of bells cast from `true_harmonic_from` = 1896 (Taylor's switch, acoustics.md §2) use
+`true_harmonic_tol_cents` = 10 (founder SDs 6.5–11.3 c, modern tuning tolerance ±10 c). Older or undated
+bells keep the all-era tolerances. Tested against an era-aware sim (hum and prime by cast year, from the
+acoustics.md founder table; see its Implications), on which main's matcher scores 117 / 117 top-1:
+
+| | sim s1 | sim s2 | corpus top-1/5/20 |
+|---|---|---|---|
+| all-era tolerances (main) | 117 | 117 | 28 / 47 / 63 |
+| true-harmonic from 1926 | 135 | 122 | 31 / 48 / 62 |
+| **true-harmonic from 1896** | **147** | **129** | **31 / 51 / 67** |
+
+σ 7 / 10 / 15 c gives corpus top-1 31 / 31 / 30, so the gain doesn't hinge on the width.
+
 ## Negative results
-- **Era-dependent tolerances** (cast year from bells.csv; true-harmonic ≥ 1900 tight, old-style hum +90 c
-  and prime −70 c with ~70–85 c windows, after acoustics.md §2): +2 top-1 on the corpus, but sim top-1 fell
-  from 101 to 74–95 of 200. Sim draws every bell's partials around the ideal with no era, so the change can't
-  be validated against it. Revisit only together with an era-aware sim.
+- **Wider shift prior for tapes and LPs** (a broad Gaussian floor of weight 0.02–0.05 and σ 100–250 c
+  under the resample peaks): corpus top-1 28 → 27–28, no top-5/20 gain. The grid already covers ±257 c
+  continuously, and the shifted true rings (Rochdale +179, Wakefield +113, Sevenoaks −257) trail by 9–15
+  nats, which the prior (at most 3–5 nats) can't close. It also helps wrong rings at large shifts.
+- **Era-dependent tolerances against an era-less sim** (earlier round; old-style hum +90 c and prime −70 c
+  with ~70–85 c windows): +2 corpus top-1, sim 101 → 74–95. Superseded by the era-aware sim above, which
+  widens nothing and only tightens true-harmonic bells.
 - **Capping the per-nominal likelihood ratio** at 1 or 2 (to stop big rings collecting hits): corpus top-1
   17 → 11. The nominal terms carry real evidence; the bias was in the line terms.
 - **Probability calibration**: sim is under-confident (mean top p ≈ 0.48 at 66 % right), the corpus

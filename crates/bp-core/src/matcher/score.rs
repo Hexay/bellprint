@@ -1,4 +1,4 @@
-use super::model::{MatchParams, PARTIALS, cents, ratio_cents};
+use super::model::{MatchParams, PARTIALS, cents, partial_tol, ratio_cents};
 use crate::audio::spectrum::Peak;
 
 /// Observed lines in cents, sorted, with strength in (0, 1].
@@ -65,12 +65,16 @@ pub(super) struct RingModel {
 }
 
 impl RingModel {
-    pub fn new(nominals_hz: &[f64], p: &MatchParams) -> Self {
+    /// `cast_years` runs parallel to `nominals_hz`.
+    pub fn new(nominals_hz: &[f64], cast_years: &[Option<u16>], p: &MatchParams) -> Self {
         let nominals: Vec<f64> = nominals_hz.iter().map(|&h| cents(h)).collect();
         let mut partials: Vec<(f64, f64)> = nominals
             .iter()
-            .flat_map(|&n| {
-                PARTIALS.iter().map(move |q| (n + ratio_cents(q.ratio), q.tol_cents.hypot(p.nominal_sigma_cents)))
+            .zip(cast_years)
+            .flat_map(|(&n, &year)| {
+                PARTIALS.iter().map(move |q| {
+                    (n + ratio_cents(q.ratio), partial_tol(q, year, p).hypot(p.nominal_sigma_cents))
+                })
             })
             .collect();
         partials.sort_by(|a, b| a.0.total_cmp(&b.0));

@@ -6,17 +6,31 @@ pub struct Partial {
     pub name: &'static str,
     pub ratio: f64,
     pub tol_cents: f64,
+    /// Tuned to the ideal on true-harmonic bells (`MatchParams::true_harmonic_from`).
+    pub era_tuned: bool,
+}
+
+const fn partial(name: &'static str, ratio: f64, tol_cents: f64, era_tuned: bool) -> Partial {
+    Partial { name, ratio, tol_cents, era_tuned }
 }
 
 pub const PARTIALS: [Partial; 7] = [
-    Partial { name: "hum", ratio: 0.25, tol_cents: 40.0 },
-    Partial { name: "prime", ratio: 0.5, tol_cents: 30.0 },
-    Partial { name: "tierce", ratio: 0.5963, tol_cents: 18.0 },
-    Partial { name: "quint", ratio: 0.749, tol_cents: 45.0 },
-    Partial { name: "nominal", ratio: 1.0, tol_cents: 0.0 },
-    Partial { name: "superquint", ratio: 1.4815, tol_cents: 25.0 },
-    Partial { name: "octave_nominal", ratio: 2.03, tol_cents: 35.0 },
+    partial("hum", 0.25, 40.0, true),
+    partial("prime", 0.5, 30.0, true),
+    partial("tierce", 0.5963, 18.0, false),
+    partial("quint", 0.749, 45.0, false),
+    partial("nominal", 1.0, 0.0, false),
+    partial("superquint", 1.4815, 25.0, false),
+    partial("octave_nominal", 2.03, 35.0, false),
 ];
+
+/// Tolerance of partial `q` on a bell cast in `cast_year`.
+pub fn partial_tol(q: &Partial, cast_year: Option<u16>, p: &MatchParams) -> f64 {
+    match cast_year {
+        Some(y) if q.era_tuned && y >= p.true_harmonic_from => p.true_harmonic_tol_cents,
+        _ => q.tol_cents,
+    }
+}
 
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -46,6 +60,10 @@ pub struct MatchParams {
     pub max_bells_dropped: usize,
     /// Fewest bells a subset may keep.
     pub min_subset_bells: usize,
+    /// Cast year from which hum and prime are taken as true-harmonic, with `true_harmonic_tol_cents`
+    /// in place of the all-era tolerance (research/acoustics.md §2, research/matcher.md).
+    pub true_harmonic_from: u16,
+    pub true_harmonic_tol_cents: f64,
 }
 
 impl Default for MatchParams {
@@ -63,6 +81,8 @@ impl Default for MatchParams {
             subset_log_prior: -3.0,
             max_bells_dropped: 4,
             min_subset_bells: 5,
+            true_harmonic_from: 1896,
+            true_harmonic_tol_cents: 10.0,
         }
     }
 }
