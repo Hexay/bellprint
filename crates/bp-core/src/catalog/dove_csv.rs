@@ -36,6 +36,16 @@ struct BellRow {
     role: String,
     #[serde(rename = "Nominal (Hz)", deserialize_with = "csv::invalid_option")]
     nominal: Option<f64>,
+    #[serde(rename = "Cast Date", default)]
+    cast: String,
+}
+
+/// First four-digit year in Dove's free-text cast date ("1765", "c1599", "1890s").
+fn cast_year(s: &str) -> Option<u16> {
+    let b = s.as_bytes();
+    (0..b.len().saturating_sub(3))
+        .find(|&i| b[i..i + 4].iter().all(u8::is_ascii_digit) && !b.get(i + 4).is_some_and(u8::is_ascii_digit))
+        .and_then(|i| s[i..i + 4].parse().ok())
 }
 
 fn reader(bytes: &[u8]) -> csv::Reader<&[u8]> {
@@ -61,15 +71,16 @@ fn leading_int(s: &str) -> Option<u32> {
     digits.parse().ok()
 }
 
-fn nominals_by_ring(bells_csv: &[u8]) -> HashMap<u32, Vec<f64>> {
-    let mut out: HashMap<u32, Vec<f64>> = HashMap::new();
+/// (nominal Hz, cast year) of every ring bell, by ring.
+fn bells_by_ring(bells_csv: &[u8]) -> HashMap<u32, Vec<(f64, Option<u16>)>> {
+    let mut out: HashMap<u32, Vec<(f64, Option<u16>)>> = HashMap::new();
     for row in reader(bells_csv).deserialize::<BellRow>() {
         let Ok(row) = row else { continue };
         if let (Some(id), Some(hz)) = (row.ring_id, row.nominal)
             && is_ring_bell(&row.role)
             && hz > 0.0
         {
-            out.entry(id).or_default().push(hz);
+            out.entry(id).or_default().push((hz, cast_year(&row.cast)));
         }
     }
     out
@@ -77,22 +88,23 @@ fn nominals_by_ring(bells_csv: &[u8]) -> HashMap<u32, Vec<f64>> {
 
 /// Rings from the bytes of Dove's `dove.csv` and `bells.csv`.
 pub(super) fn parse_rings(dove_csv: &[u8], bells_csv: &[u8]) -> Vec<Ring> {
-    let mut nominals = nominals_by_ring(bells_csv);
+    let mut bells = bells_by_ring(bells_csv);
     let mut rings = Vec::new();
     for row in reader(dove_csv).deserialize::<DoveRow>() {
         // Dove's CSV has a BOM and occasional odd rows; skip what doesn't parse.
         let Ok(row) = row else { continue };
         let (Some(lat), Some(lon)) = (row.lat, row.lon) else { continue };
-        let mut hz = nominals.remove(&row.ring_id).unwrap_or_default();
-        if hz.is_empty()
+        let mut b = bells.remove(&row.ring_id).unwrap_or_default();
+        if b.is_empty()
             && let Some(t) = row.tenor_hz.filter(|t| *t > 0.0)
         {
-            hz.push(t);
+            b.push((t, None));
         }
-        if hz.is_empty() {
+        if b.is_empty() {
             continue;
         }
-        hz.sort_by(|a, b| b.total_cmp(a));
+        b.sort_by(|x, y| y.0.total_cmp(&x.0));
+        let (hz, cast_years): (Vec<f64>, _) = b.into_iter().unzip();
         rings.push(Ring {
             ring_id: row.ring_id,
             tower_id: row.tower_id,
@@ -104,6 +116,7 @@ pub(super) fn parse_rings(dove_csv: &[u8], bells_csv: &[u8]) -> Vec<Ring> {
             lon,
             bells: leading_int(&row.bells).unwrap_or(hz.len() as u32),
             nominals: hz,
+            cast_years,
         });
     }
     rings

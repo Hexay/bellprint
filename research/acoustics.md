@@ -247,6 +247,14 @@ The column cents and ratios are [I] arithmetic from the fitted parameters.
   - old-style / untuned: hum −2400…−2150 (centre −2270), prime −1450…−1150 (centre −1330), tierce
     −900…−800 (centre −865), quint −500…−300.
   - Pick the class from `Cast Date` and `Founder` in bells.csv when available. Otherwise use the union.
+- **Simulator hum and prime** (`sim/bell.rs`, `Tuning`), [C] from the §2 founder table, pooled by n
+  (mean of means; SD = √(mean within-founder variance + variance of the means)):
+  - true-harmonic, Taylor > 1895 and Mears/Whitechapel > 1926 (n = 1775): hum +0 ± 10 c, prime −2 ± 10 c;
+  - old-style, Dobson, Knight/Catlin, Wells, Rudhall, Mears < 1851 and Briant (n = 826): hum +97 ± 68 c,
+    prime −89 ± 93 c.
+  - A bell is true-harmonic if cast ≥ 1926, old-style if cast < 1896, and either with even odds between
+    (Taylor switched in 1896, Whitechapel only in the 1920s) or when Dove has no cast date. Retuning old
+    bells is ignored: per §2 it rarely makes them fully true-harmonic.
 - **Weight the nominal highest, then superquint, tierce and octave nominal.** The quint is weak and
   often missing, so give it near-zero weight and never penalise its absence. Hum and prime are
   diagnostic of tuning style but carry ±100+ c spread in old bells.

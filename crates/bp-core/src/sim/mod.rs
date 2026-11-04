@@ -4,7 +4,7 @@ pub mod ringing;
 
 use crate::audio::Audio;
 use crate::catalog::Ring;
-use bell::BellVoice;
+use bell::{BellVoice, Tuning};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
@@ -70,7 +70,11 @@ pub fn simulate(ring: &Ring, p: &SimParams, seed: u64) -> (Audio, SimTruth) {
     let strike_len = 15.0;
     let voices: Vec<Vec<f32>> = true_nominals
         .iter()
-        .map(|&h| BellVoice::random(h, &mut rng).render(sr, strike_len, &mut rng))
+        .zip(&ring.cast_years)
+        .map(|(&h, &year)| {
+            let tuning = Tuning::random_for(year, &mut rng);
+            BellVoice::random(h, tuning, &mut rng).render(sr, strike_len, &mut rng)
+        })
         .collect();
     let mut sig = vec![0.0f64; n];
     for (b, t) in ringing::strikes(true_nominals.len(), p.pattern, tenor, p.duration_s, &mut rng) {

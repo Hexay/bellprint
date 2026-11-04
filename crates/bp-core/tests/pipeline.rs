@@ -56,7 +56,11 @@ fn light_ring_with_trebles_above_the_band_still_ranks() {
 fn ringing_the_back_six_of_eight_still_finds_the_eight() {
     let c = catalog();
     let ring = c.rings.iter().find(|r| r.nominals.len() == 8 && r.complete()).unwrap();
-    let back6 = bp_core::catalog::Ring { nominals: ring.nominals[2..].to_vec(), ..ring.clone() };
+    let back6 = bp_core::catalog::Ring {
+        nominals: ring.nominals[2..].to_vec(),
+        cast_years: ring.cast_years[2..].to_vec(),
+        ..ring.clone()
+    };
     let (audio, _) = simulate(&back6, &clean(), 7);
     let rank = |matcher: MatchParams| {
         let report = locate_audio(c, &audio, &LocateOptions { top: 50, matcher, ..Default::default() });

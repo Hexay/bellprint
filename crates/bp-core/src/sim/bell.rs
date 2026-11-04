@@ -15,10 +15,39 @@ pub struct BellVoice {
     components: Vec<Component>,
 }
 
-/// (cents above the nominal, sd of that interval in cents, relative amplitude)
+/// Tuning style, which sets where the hum and prime fall (research/acoustics.md §2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tuning {
+    TrueHarmonic,
+    OldStyle,
+}
+
+impl Tuning {
+    /// Taylor tuned true-harmonic from 1896, Whitechapel from the 1920s; bells cast between are a mix,
+    /// as are bells with no recorded date.
+    pub fn random_for<R: Rng>(cast_year: Option<u16>, rng: &mut R) -> Self {
+        let p_true = match cast_year {
+            Some(y) if y >= 1926 => 1.0,
+            Some(y) if y < 1896 => 0.0,
+            _ => 0.5,
+        };
+        if rng.random_bool(p_true) { Self::TrueHarmonic } else { Self::OldStyle }
+    }
+
+    /// (cents, sd) of hum and prime from the ideal -2400 and -1200: founder means pooled by n.
+    fn hum_prime(self) -> [(f64, f64); 2] {
+        match self {
+            Self::TrueHarmonic => [(0.0, 10.0), (-2.0, 10.0)],
+            Self::OldStyle => [(97.0, 68.0), (-89.0, 93.0)],
+        }
+    }
+}
+
+/// (cents above the nominal, sd of that interval in cents, relative amplitude); hum and prime come from
+/// `Tuning`.
 const SPEC: [(f64, f64, f64); 9] = [
-    (-2400.0, 35.0, 0.5),  // hum
-    (-1200.0, 30.0, 0.4),  // prime
+    (-2400.0, 0.0, 0.5),   // hum
+    (-1200.0, 0.0, 0.4),   // prime
     (-900.0, 15.0, 0.6),   // tierce: minor third above the prime
     (-500.0, 40.0, 0.15),  // quint
     (0.0, 0.0, 1.0),       // nominal
@@ -33,11 +62,13 @@ fn t60_for(hz: f64, size: f64) -> f64 {
 }
 
 impl BellVoice {
-    pub fn random<R: Rng>(nominal_hz: f64, rng: &mut R) -> Self {
+    pub fn random<R: Rng>(nominal_hz: f64, tuning: Tuning, rng: &mut R) -> Self {
         let amp_jitter = LogNormal::new(0.0, 0.4).unwrap();
         let size = LogNormal::new(0.0, 0.25).unwrap().sample(rng);
+        let low = tuning.hum_prime();
         let mut components = Vec::new();
-        for &(c, sd, a) in &SPEC {
+        for (i, &(c, sd, a)) in SPEC.iter().enumerate() {
+            let (c, sd) = low.get(i).map_or((c, sd), |&(m, s)| (c + m, s));
             let cents = c + if sd > 0.0 { Normal::new(0.0, sd).unwrap().sample(rng) } else { 0.0 };
             let hz = nominal_hz * 2f64.powf(cents / 1200.0);
             let amp = a * amp_jitter.sample(rng);

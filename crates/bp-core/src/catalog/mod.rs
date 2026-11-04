@@ -19,6 +19,8 @@ pub struct Ring {
     pub bells: u32,
     /// Known nominals, highest first.
     pub nominals: Vec<f64>,
+    /// Cast year of each bell in `nominals`, where Dove gives one.
+    pub cast_years: Vec<Option<u16>>,
 }
 
 impl Ring {
