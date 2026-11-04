@@ -88,3 +88,51 @@ with BD2002's Q: nominal 1200, hum 4000, all else 3000 (nominal ≈ 2.6 s, prime
   (old sim −4/−1), where §10's sim gave +9/+1. The corpus still prefers the mean, +5/+2/+4.
 - Clapper damping (W2012, single source) remains unmodelled and is the likeliest remaining gap: it would
   cut the long-lived prime, tierce and hum that keep the percentile competitive in the sim.
+
+## 12. Re-tune under the mean; window length; treble tilt (2026-11-04, on main 1fb383d)
+
+Same protocol; `--peaks` overrides on main's binary, corpus screened first and sims run only for corpus
+gains. Baseline: sim s1 147/181, s2 128/172, corpus top-1/5/20 40/60/76.
+
+| change | seed 1 | seed 2 | corpus | verdict |
+|---|---|---|---|---|
+| `min_prominence_db` 2 / 5 / 6 | – | – | 42/61/76, 39/59/74, 39/58/71 | peak at 3 |
+| **`min_prominence_db` 3** | **146/181** | **128/171** | **43/61/78** | **kept** (18 clips up / 9 down) |
+| `floor_half_width_cents` 75 | – | – | 39/61/75 | worse |
+| `floor_half_width_cents` 300 | 146/181 | 128/172 | 41/63/76 | passes alone; nothing on top of 3 dB (43/61/77) |
+| `max_peaks` 60 / 120 (at 4 dB) | – | – | 39/58/76, 40/60/77 | cap rarely binds at 4 dB |
+| **3 dB + `max_peaks` 120** | **146/181** | **128/171** | **43/62/79** | **kept**: at 3 dB clips fill 80; no sim rank moves |
+| `sparse_min_lines` 10 / 30 | – | – | 40/60/76, 40/60/76 | identical, as §10 |
+| `window_s` 0.35 (0.37 s) / 1.4 (1.49 s) | – | – | 33/53/68, 38/55/74 | both worse; 0.74 s kept |
+| tilt +1.5 / +3 / +5 dB/oct above 1 kHz; +3 above 600 Hz (at 3 dB, 120) | – | – | 43/60/76, 39/57/73, 38/56/73; 39/56/73 | worse, monotonic |
+
+- **Prominence.** Corpus top-1 peaks at 3 dB, top-20 rises from 6 dB down to 3. The gains are faint
+  nominals of mid-ranked clips (rode-distant 41 → 20, belfast-st-thomas 7 → 3, norton-fitzwarren 27 → 20);
+  the downs are mostly one or two ranks (ap-kirkbymoorside-chime 4 → 8 the largest). A 2 dB cut admits
+  floor ripple faster than nominals.
+- **Fallback test fixture.** At 3 dB the line-count fallback picks p90 over p75 on the synthetic
+  burst in `tests/longterm.rs`: p90 lies inside the burst and its ripple lines out-count eight true tones.
+  The test pins 4 dB. On the corpus the 3 dB run is measured end to end; the fallback's two ranked
+  clips at 4 dB now get ≥ 20 lines from the mean (ia-inveraray-distant 17 → 25 lines, rank 2 → 3;
+  ap-kirkbymoorside-chime 16 → 28, 4 → 8). A criterion less sensitive to ripple (summed or capped prominence) is untested.
+- **Window.** All 151 corpus files are 44.1 kHz, so `window_s` 0.7 rounds to 32768 samples = 0.74 s,
+  1.35 Hz bins. The ±2-bin peak rule then resolves lines ≥ 3 bins (4 Hz) apart: a semitone at 70 Hz
+  (4.2 Hz), i.e. the hums of a heavy ring. Nominal spacing (≥ 6 %, ≥ 30 Hz) is never the limit; the
+  sim's ±8 c speed spread is a global shift and does not bear on resolution; within-bell doublets
+  (~1 Hz) are unresolved at any length tried and merge into one beating peak. 0.37 s (2.7 Hz bins) merges
+  low partials and costs 7 top-1; 1.49 s (0.67 Hz) splits doublets and halves the frames in the mean,
+  costing 2 top-1. Gotcha: at 48 kHz, 0.7 s rounds up to 65536 samples (1.37 s); untested on the corpus
+  since no clip is 48 kHz.
+- **Trebles are under-recovered, but not for lack of floor slope.** At the best global shift and 5 c,
+  true nominals have a line in 70 % of treble-half and 73 % of tenor-half cases, against 60 % and 52 %
+  when each clip's lines are scored against another clip's ring. Correcting for chance,
+  p = (found − chance)/(1 − chance) falls from 0.51 at 500–700 Hz to 0.27 at 1–1.4 kHz and 0.15 at
+  1.4–2 kHz, and matched nominals' prominence falls ≈ 5 dB/oct (17.8 dB at 600 Hz, 10.2 at 1.7 kHz).
+  Misses with a clear treble deficit (≤ ½ of treble nominals, all tenors): carlisle-cathedral,
+  bbc-pembroke, bbc-oxford-magdalen; ranked low: bbc-winchester-cathedral 16, guildford-tolling 34.
+- **Tilt rejected.** The floor is a ±150 c local median, so a spectral tilt or per-octave
+  normalisation cancels out of the prominence. Correcting instead for the nominal's T60 ∝ 1/f (≈ 3 dB/oct
+  in the mean) by adding a tilt to prominences above a pivot loses at every slope: above 1 kHz the line
+  density is already near the chance ceiling (chance hit rate 0.63–0.67), and the tilt boosts every upper
+  partial and noise line there as much as the faint trebles. Recovering trebles needs a cleaner high
+  band (per-blow or onset-gated extraction), not a re-weighted one.
