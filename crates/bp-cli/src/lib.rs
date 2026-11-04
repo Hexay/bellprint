@@ -171,8 +171,8 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
                 for (i, m) in report.matches.iter().enumerate() {
                     let r = &m.ring;
                     println!(
-                        "{:>2}. p={:.3} {} ({}), {} [{} bells, {} heard, shift {:+.0}c] tower {} {:.5},{:.5}",
-                        i + 1, m.probability, r.place, r.dedication, r.county, r.nominals.len(),
+                        "{:>2}. p={:.3} lead {:.1} {} ({}), {} [{} bells, {} heard, shift {:+.0}c] tower {} {:.5},{:.5}",
+                        i + 1, m.probability, m.margin, r.place, r.dedication, r.county, r.nominals.len(),
                         m.bells_heard, m.shift_cents, r.tower_id, r.lat, r.lon
                     );
                 }

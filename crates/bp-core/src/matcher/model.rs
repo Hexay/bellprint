@@ -1,5 +1,7 @@
 /// The matcher's model of a bell: partials as ratios of the nominal, with how far real bells stray (cents).
-/// Ideal true-harmonic ratios; old bells' hum and prime wander, hence the wide tolerances. See docs/METHOD.md.
+/// Near true-harmonic ratios; old bells' hum, prime and quint wander, hence their wider tolerances.
+/// Tolerances follow the spread measured on the real corpus; see research/matcher.md. Too-wide partials
+/// let a bigger ring's narrow nominals claim the true ring's partial lines.
 pub struct Partial {
     pub name: &'static str,
     pub ratio: f64,
@@ -7,13 +9,13 @@ pub struct Partial {
 }
 
 pub const PARTIALS: [Partial; 7] = [
-    Partial { name: "hum", ratio: 0.25, tol_cents: 70.0 },
-    Partial { name: "prime", ratio: 0.5, tol_cents: 50.0 },
-    Partial { name: "tierce", ratio: 0.5946, tol_cents: 30.0 },
-    Partial { name: "quint", ratio: 0.749, tol_cents: 50.0 },
+    Partial { name: "hum", ratio: 0.25, tol_cents: 40.0 },
+    Partial { name: "prime", ratio: 0.5, tol_cents: 30.0 },
+    Partial { name: "tierce", ratio: 0.5963, tol_cents: 18.0 },
+    Partial { name: "quint", ratio: 0.749, tol_cents: 45.0 },
     Partial { name: "nominal", ratio: 1.0, tol_cents: 0.0 },
-    Partial { name: "superquint", ratio: 1.471, tol_cents: 45.0 },
-    Partial { name: "octave_nominal", ratio: 2.03, tol_cents: 55.0 },
+    Partial { name: "superquint", ratio: 1.4815, tol_cents: 25.0 },
+    Partial { name: "octave_nominal", ratio: 2.03, tol_cents: 35.0 },
 ];
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -37,20 +39,30 @@ pub struct MatchParams {
     pub full_strength_db: f64,
     /// Rings kept after the cheap nominal-only pass.
     pub shortlist: usize,
+    /// Log prior of a band ringing only a contiguous run of the ring (back 8 of 10, front 6 of 8)
+    /// rather than every bell. Without it each silent bell costs ln(1 - p_bell_heard).
+    pub subset_log_prior: f64,
+    /// Most bells a subset may leave out, from either end of the ring.
+    pub max_bells_dropped: usize,
+    /// Fewest bells a subset may keep.
+    pub min_subset_bells: usize,
 }
 
 impl Default for MatchParams {
     fn default() -> Self {
         Self {
-            nominal_sigma_cents: 8.0,
+            nominal_sigma_cents: 5.0,
             max_shift_cents: 40.0,
             shift_sigma_cents: 15.0,
             resample_shifts: true,
             p_bell_heard: 0.97,
-            background_share: 0.3,
+            background_share: 0.5,
             band_cents: 8500.0,
             full_strength_db: 24.0,
             shortlist: 400,
+            subset_log_prior: -3.0,
+            max_bells_dropped: 4,
+            min_subset_bells: 5,
         }
     }
 }
