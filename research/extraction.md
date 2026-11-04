@@ -219,40 +219,10 @@ Resolution needed (**Inference**: Δf = f·(2^(c/1200) − 1)):
 - Inference: the interval model d = 2·T_row/(2n+1) (it matched S6 within 4 %), the parameter tables in §5–6,
   blow-synchronous differencing, and narrowband ESPRIT.
 
-## 9. Measured on bellprint (2026-11-04, main 4e4a7c9: p75, 2.5 kHz, out-of-band nominals unobservable)
+## 9–10. Measured on bellprint
 
-One parameter at a time via `--peaks`; corpus is all 141 clips, sim `eval-sim --n 200`. Baseline: sim seed 1
-132/172, seed 2 122/164, corpus top-1/5/20 28/43/61. Keep rule: corpus better, neither seed down > 2 top-1.
+A/B results (peak picking, aggregation, sim decay): see [extraction_ab.md](extraction_ab.md).
 
-| change | seed 1 | seed 2 | corpus | verdict |
-|---|---|---|---|---|
-| `min_prominence_db` 9 | 132/171 | 121/164 | 23/34/51 | worse |
-| `min_prominence_db` 4 | 131/172 | 122/164 | 28/47/63 | **kept** |
-| `min_prominence_db` 3 | 131/173 | 121/162 | 28/49/64 | same trend; 4 kept as the margin over floor noise in 8 s clips |
-| aggregate mean | 132/170 | 117/167 | 33/52/66 | seed 2 −5 |
-| p90 / p85 / p60 | 129, 127, 127 | 121, 119, 117 | 29/51/64, 33/48/62, 26/38/51 | sim −3 to −5 |
-| log-mean (mean of dB) | 131/171 | 115/165 | 21/32/50 | worse |
-| trimmed mean ≤ p90 / ≤ p75 | 132, 130 | 116, 116 | 29/45/61, 24/40/54 | seed 2 −6 |
-| `min_hz` 150 / 250 | 132, 132 | 122, 118 | 27/43/60, 27/43/59 | worse: hums carry evidence |
-| `max_peaks` 50 / 120 | 132, 132 | 122, 122 | 25/43/57, 28/43/61 | cap rarely binds (most clips 40–70 lines) |
-| tonal frame gate, 3 / 6 / 10 dB | 132, 132, 132 | 120, 122, 122 | 29/41/59, 30/42/63, 30/42/63 | per clip 8 up / 9 down; nothing on top of mean, p85, p90 or prom 4 |
-| `--extraction blows` | 84/128 | 85/125 | 19/35/47 | no clip class wins (17 up / 38 down) |
-
-- **Corpus wants more transient weight than sim.** Corpus top-1 ranks mean ≈ p85 > p90 > p75 > p60 >
-  log-mean. A nominal decays within a second or two of each strike and the hum rings on, so higher
-  aggregates favour nominals; long `sc-` practice clips with gaps between touches gain most (sc-rye 14 → 1,
-  sc-llanfeugan 43 → 1 under p90/mean). The 8 s sim, which rings throughout, loses 3–6 top-1 for every
-  aggregate above p75. Unresolved: whether sim's decay/strike model or the corpus is off.
-- **Several clips have 0 lines at p75** (stow-on-the-wold, lyndhurst, ia-scarborough-st-mary,
-  ia-lincoln-cathedral-package, several chimes): the bells sound in fewer than a quarter of the frames. Even
-  with the mean, lyndhurst has only 11 lines over 6 dB.
-- **Frame gate** (tried): per 0.74 s frame, mean prominence of its 15 strongest lines over a ±150 c moving
-  mean; keep frames within N dB of the 90th-percentile frame. It restores lines on stow (0 → 22) and helps
-  bristol-redcliffe (traffic, 43 → 5), but loses as many elsewhere. It never changes the sim (no frame is
-  dropped). Not kept.
-- **Lower prominence threshold.** Corpus top-5/20 rise monotonically from 9 dB down to 3 dB, with sim flat.
-  Faint nominals of distant rings (ia-inveraray-distant miss → 3, bbc-bangor-comgall miss → 11) sit at
-  4–6 dB. Top-1 is unchanged and per clip it is 17 up / 18 down, so the gain is mainly in the top-5/20.
 
 ## Implications for bellprint
 

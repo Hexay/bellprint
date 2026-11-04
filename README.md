@@ -44,8 +44,8 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
 
 ## How it works
 
-1. **Lines.** Take the 75th percentile of the clip's power spectrum over time, which keeps sustained bell
-   partials and damps brief noises such as speech or traffic. Keep the lines up to 2.5 kHz that stand out
+1. **Lines.** Average the clip's power spectrum over time (Welch), which keeps the short-lived nominals of
+   every blow even when the bells sound in only part of the clip. Keep the lines up to 2.5 kHz that stand out
    from a moving-median floor; bells pitched above that are skipped rather than counted as missing.
 2. **Bell model.** Each bell predicts lines at its hum, prime, tierce, quint, nominal, superquint and octave
    nominal, with tolerances in cents from published bell measurements ([research/acoustics.md](research/acoustics.md)).

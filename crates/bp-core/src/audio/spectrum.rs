@@ -22,8 +22,9 @@ pub struct PeakParams {
     /// Half-width of the moving median that defines the floor.
     pub floor_half_width_cents: f64,
     pub aggregate: Aggregate,
-    /// Below this many lines the bells sound in too few frames for `aggregate` to see them; the
-    /// `sparse_fallback` aggregates are tried in order and the one giving the most lines is kept.
+    /// Below this many lines `aggregate` has missed the bells (masked by loud intermittent noise, or
+    /// sounding in too few frames); the `sparse_fallback` aggregates are tried in order and the one
+    /// giving the most lines is kept.
     pub sparse_min_lines: usize,
     pub sparse_fallback: Vec<Aggregate>,
 }
@@ -39,10 +40,12 @@ impl Default for PeakParams {
             min_prominence_db: 4.0,
             max_peaks: 80,
             floor_half_width_cents: 150.0,
-            aggregate: Aggregate::Percentile(75.0),
-            // Sim clips give >= 22 lines; corpus clips under 20 are chimes or bells in < 1/4 of frames.
+            // Nominals die within seconds of each blow while the hum rings on, so a percentile favours the
+            // hum. See research/extraction_ab.md §10.
+            aggregate: Aggregate::Mean,
+            // Sim clips give >= 22 lines; the percentile rejects noise that swamps the mean.
             sparse_min_lines: 20,
-            sparse_fallback: vec![Aggregate::Mean],
+            sparse_fallback: vec![Aggregate::Percentile(75.0), Aggregate::Percentile(90.0)],
         }
     }
 }

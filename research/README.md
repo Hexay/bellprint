@@ -8,6 +8,7 @@ Web research gathered 2026-11. Each file tags claims as verified (with source) o
 | [acoustics.md](acoustics.md) | Partial ratios and cents windows (true-harmonic vs old-style), doublets, decay, strike note, temperature, Dove measurement accuracy, retuning |
 | [decay.md](decay.md) | Measured per-partial decay (hum, prime, tierce, nominal), clapper damping, the sim's decay model |
 | [extraction.md](extraction.md) | Onset detection, per-blow nominal estimation, Wavanal, HawkEar and other striking tools, inharmonic/high-resolution pitch methods, blow-timing numbers |
+| [extraction_ab.md](extraction_ab.md) | Measured A/B of line extraction on sim and corpus: prominence, aggregation, sim partial decay |
 | [data_sources.md](data_sources.md) | Dove fields and fill rates, Hibbert data, carillon DBs, German Glockenbücher, Dutch/French inventories, BellBoard/Felstead, service times, licences |
 | [prior_work.md](prior_work.md) | Bells as OSINT/forensic evidence, the viral Derbyshire claim (unverified), ENF forensics, audio geolocation, MIR bell papers |
 | [matcher.md](matcher.md) | Why real recordings missed (bigger rings claiming partial lines), partial spreads measured on the corpus, ring subsets, negative results |
