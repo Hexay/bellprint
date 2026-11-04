@@ -1,6 +1,6 @@
 # bellprint
 
-![Three panels: the spectrum of a real recording at Oxford, Lincoln College with its bells' nominals marked; a map of the 12 towers whose tenor shares that pitch; and a map where matching the whole ring ranks Lincoln College first.](docs/img/header.png)
+![Three panels: the spectrum of a real recording at Oxford, St Ebbe with its bells' nominals marked; a map of the 4 towers whose tenor shares that pitch; and a map where matching the whole ring ranks St Ebbe first.](docs/img/header.png)
 
 [![CI](https://github.com/Hexay/bellprint/actions/workflows/ci.yml/badge.svg)](https://github.com/Hexay/bellprint/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/bellprint.svg)](https://pypi.org/project/bellprint/)
