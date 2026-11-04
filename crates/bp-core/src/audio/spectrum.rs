@@ -37,7 +37,8 @@ impl Default for PeakParams {
             // 98.7 % of Dove nominals lie below this; lines above it helped wrong rings more than right ones.
             max_hz: 2500.0,
             // The matcher's background model absorbs weak chance lines; a higher cut drops faint real nominals.
-            min_prominence_db: 4.0,
+            // The mean's floor is smoother than a percentile's, so 3 dB clears it (research/extraction_ab.md §12).
+            min_prominence_db: 3.0,
             max_peaks: 80,
             floor_half_width_cents: 150.0,
             // Nominals die within seconds of each blow while the hum rings on, so a percentile favours the

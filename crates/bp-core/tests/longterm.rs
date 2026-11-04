@@ -39,8 +39,10 @@ fn percentile_spectrum_ignores_an_intermittent_noise_burst() {
 
 #[test]
 fn sparse_fallback_recovers_a_tone_the_mean_loses() {
-    let mean = tone_prominence(5.0, &without_fallback(Aggregate::Mean));
-    let default = tone_prominence(5.0, &PeakParams::default());
+    // Below 4 dB p90's burst ripple out-counts p75's eight tones here (research/extraction_ab.md §12).
+    let p = PeakParams { min_prominence_db: 4.0, ..Default::default() };
+    let mean = tone_prominence(5.0, &PeakParams { sparse_fallback: Vec::new(), ..p.clone() });
+    let default = tone_prominence(5.0, &p);
     assert!(mean == 0.0 && default > 20.0, "mean {mean:.1} dB, default {default:.1} dB");
 }
 
