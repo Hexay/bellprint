@@ -21,7 +21,7 @@ import numpy as np
 import soundfile as sf
 
 ROOT = Path(__file__).resolve().parent.parent
-CLIP = sys.argv[1] if len(sys.argv) > 1 else "fsg-matlock-st-giles"
+CLIP = sys.argv[1] if len(sys.argv) > 1 else "bbc-lichfield-cathedral"
 BIN = Path(os.environ.get("BELLPRINT_BIN", ROOT / "target/fastrel/bellprint"))
 OUT = ROOT / "docs/img/header.png"
 
@@ -32,8 +32,8 @@ HEARD_CENTS = 9.4  # where the matcher's 8 c Gaussian falls to 0.5 (matcher/scor
 BOUNDS = (-5.9, 1.9, 49.9, 55.9)  # lon/lat box: England and Wales
 # Keep in step with README.md's Accuracy table.
 FOOTER = (
-    "Benchmarks (README, Accuracy): simulated, 200 random Dove rings: right tower first 66 %.  "
-    "Real recordings of 141 named towers: right tower first for 28."
+    "Benchmarks (README, Accuracy): simulated, 200 random Dove rings: right tower first 74 %.  "
+    "Real recordings of 141 named towers: right tower first for 32."
 )
 
 plt.rcParams.update({"font.family": ["Liberation Sans", "DejaVu Sans"], "text.color": INK})
@@ -92,6 +92,12 @@ def spectrum(audio, windows, win_s=0.7):
 def heard(nominals, shift, peaks):
     peak_c = 1200 * np.log2(np.array([p["hz"] for p in peaks]))
     return [np.min(np.abs(peak_c - (1200 * np.log2(n) + shift))) <= HEARD_CENTS for n in nominals]
+
+
+def ring_label(ring, sep=", "):
+    """Place plus dedication, dropping the dedication when it would overrun a panel."""
+    full = f"{ring['place']}{sep}{ring['dedication']}"
+    return full if len(full) <= 24 else ring["place"]
 
 
 def panel_head(fig, x, y, num, title, sub):
@@ -170,7 +176,7 @@ def main():
     fig.text(0.04, 0.855, f"Dove's Guide gives the pitch of almost every bell in {len(towers):,} towers. "
              "bellprint matches the whole ring against it.", fontsize=17, color=INK2)
 
-    place = f"{ring['place']}, {ring['dedication']}"
+    place = ring_label(ring)
     panel_head(fig, 0.04, 0.745, "1", "Listen",
                f"{place}: {best['bells_heard']} of {ring['bells']} nominals found in a {secs:.0f} s clip.")
     fig.text(0.04, 0.672, "Lines: Dove's nominals for this ring.  Blue found, grey missed, red the tenor.",
@@ -194,7 +200,7 @@ def main():
         if m is not best:
             dot(ax3, m["ring"]["lon"], m["ring"]["lat"], BLUE)
     dot(ax3, ring["lon"], ring["lat"], RED, size=420, marker="*", z=4)
-    ax3.annotate(f"{ring['place']},\n{ring['dedication']}", (ring["lon"], ring["lat"]), xytext=(-14, 10),
+    ax3.annotate(ring_label(ring, ",\n"),(ring["lon"], ring["lat"]), xytext=(-14, 10),
                  textcoords="offset points", color=RED, fontsize=15, va="bottom", ha="right")
 
     fig.text(0.04, 0.045, FOOTER, fontsize=13.5, color=INK2)

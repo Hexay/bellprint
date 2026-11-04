@@ -1,6 +1,6 @@
 # bellprint
 
-![Three panels: the spectrum of a real recording at Matlock, St Giles with its bells' nominals marked; a map of the 42 towers whose tenor shares that pitch; and a map where matching the whole ring ranks St Giles first.](docs/img/header.png)
+![Three panels: the spectrum of a real recording at Lichfield Cathedral with its bells' nominals marked; a map of the 17 towers whose tenor shares that pitch; and a map where matching the whole ring ranks Lichfield first.](docs/img/header.png)
 
 [![CI](https://github.com/Hexay/bellprint/actions/workflows/ci.yml/badge.svg)](https://github.com/Hexay/bellprint/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/bellprint.svg)](https://pypi.org/project/bellprint/)
@@ -8,8 +8,8 @@
 
 Work out which church tower you can hear in a recording, from the pitches of its bells.
 
-**Status: early research software.** On simulated recordings it puts the right tower first about two times in
-three; on real recordings, about one time in five. See [Accuracy](#accuracy).
+**Status: early research software.** On simulated recordings it puts the right tower first about seven times
+in ten; on real recordings, nearly one time in four. See [Accuracy](#accuracy).
 
 ## Why the whole ring
 
@@ -49,6 +49,7 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
    from a moving-median floor; bells pitched above that are skipped rather than counted as missing.
 2. **Bell model.** Each bell predicts lines at its hum, prime, tierce, quint, nominal, superquint and octave
    nominal, with tolerances in cents from published bell measurements ([research/acoustics.md](research/acoustics.md)).
+   Bells cast from 1896, when true-harmonic tuning began, get much tighter hum and prime tolerances.
 3. **Match.** Score every Dove ring on how many of its nominals are present and how well its predicted
    partials explain the observed lines, compared with chance. Bands often ring only the back or front bells
    of a larger ring, so those subsets are scored too, at a small penalty. One pitch shift is fitted per clip,
@@ -64,8 +65,8 @@ that rise when a bell strikes) and `--auto-window` (analyse only the most bell-l
 
 | Benchmark | Setup | Right tower first | In top 5 |
 |---|---|---|---|
-| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned | **66 %** | 86 % |
-| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **28 / 141** | 49 / 141 |
+| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **74 %** | 88 % |
+| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **32 / 141** | 53 / 141 |
 
 - The simulator shares no code or constants with the matcher's bell model, but it is kinder than reality: no
   reverb, no automatic gain control, and ringing for the whole clip.
