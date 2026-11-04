@@ -1,5 +1,5 @@
 use super::Audio;
-use super::longterm::{Aggregate, long_term_power};
+use super::longterm::{Aggregate, Frames};
 use realfft::RealFftPlanner;
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +22,10 @@ pub struct PeakParams {
     /// Half-width of the moving median that defines the floor.
     pub floor_half_width_cents: f64,
     pub aggregate: Aggregate,
+    /// Below this many lines the bells sound in too few frames for `aggregate` to see them; the
+    /// `sparse_fallback` aggregates are tried in order and the one giving the most lines is kept.
+    pub sparse_min_lines: usize,
+    pub sparse_fallback: Vec<Aggregate>,
 }
 
 impl Default for PeakParams {
@@ -36,6 +40,9 @@ impl Default for PeakParams {
             max_peaks: 80,
             floor_half_width_cents: 150.0,
             aggregate: Aggregate::Percentile(75.0),
+            // Sim clips give >= 22 lines; corpus clips under 20 are chimes or bells in < 1/4 of frames.
+            sparse_min_lines: 20,
+            sparse_fallback: vec![Aggregate::Mean],
         }
     }
 }
@@ -90,9 +97,23 @@ fn floor_db(db: &[f64], k: usize, bin_hz: f64, half_cents: f64) -> f64 {
     *w.select_nth_unstable_by(mid, f64::total_cmp).1
 }
 
-/// Prominent spectral lines, strongest first.
+/// Prominent spectral lines of the long-term spectrum, strongest first.
 pub fn find_peaks(audio: &Audio, p: &PeakParams) -> Vec<Peak> {
-    let (power, bin_hz) = long_term_power(audio, p.window_s, p.max_hz, p.aggregate);
+    let frames = Frames::new(audio, p.window_s, p.max_hz);
+    let mut peaks = pick_peaks(&frames.aggregate(p.aggregate), frames.bin_hz, p);
+    for &agg in &p.sparse_fallback {
+        if peaks.len() >= p.sparse_min_lines {
+            break;
+        }
+        let alt = pick_peaks(&frames.aggregate(agg), frames.bin_hz, p);
+        if alt.len() > peaks.len() {
+            peaks = alt;
+        }
+    }
+    peaks
+}
+
+fn pick_peaks(power: &[f64], bin_hz: f64, p: &PeakParams) -> Vec<Peak> {
     let db: Vec<f64> = power.iter().map(|x| 10.0 * (x + 1e-20).log10()).collect();
     let lo = ((p.min_hz / bin_hz) as usize).max(3);
     let hi = ((p.max_hz / bin_hz) as usize).min(db.len() - 3);

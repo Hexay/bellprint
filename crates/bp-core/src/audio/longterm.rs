@@ -14,47 +14,44 @@ pub enum Aggregate {
     Percentile(f64),
 }
 
-/// Calls `each` with the power spectrum of every Hann frame (75 % overlap); returns Hz per bin.
-fn for_each_frame(audio: &Audio, window_s: f64, mut each: impl FnMut(Vec<f64>)) -> f64 {
-    let n = ((window_s * audio.sample_rate as f64) as usize).next_power_of_two();
-    let mut fft = Fft::new(n, n, audio.sample_rate);
-    let mut start = 0;
-    loop {
-        each(fft.power(&audio.samples, start as i64));
-        start += n / 4;
-        if start + n > audio.samples.len() {
-            break;
-        }
-    }
-    fft.bin_hz
+/// Power spectra of every Hann frame (75 % overlap) of a clip, up to a frequency limit.
+pub struct Frames {
+    rows: Vec<Vec<f32>>,
+    pub bin_hz: f64,
 }
 
-/// Long-term spectrum up to `max_hz` (plus margin for the floor estimate). Returns (power per bin, Hz per bin).
-pub fn long_term_power(audio: &Audio, window_s: f64, max_hz: f64, agg: Aggregate) -> (Vec<f64>, f64) {
-    let keep = |len: usize| ((max_hz * 1.2 * 2.0 / audio.sample_rate as f64 * len as f64) as usize + 4).min(len);
-    let (mut sum, mut frames, mut stored): (Vec<f64>, usize, Vec<Vec<f32>>) = (Vec::new(), 0, Vec::new());
-    let bin_hz = for_each_frame(audio, window_s, |mut p| {
-        p.truncate(keep(p.len()));
-        frames += 1;
-        match agg {
-            Aggregate::Mean => {
-                sum.resize(p.len(), 0.0);
-                sum.iter_mut().zip(p).for_each(|(a, x)| *a += x);
+impl Frames {
+    /// Frames up to `max_hz` (plus margin for the floor estimate).
+    pub fn new(audio: &Audio, window_s: f64, max_hz: f64) -> Self {
+        let n = ((window_s * audio.sample_rate as f64) as usize).next_power_of_two();
+        let mut fft = Fft::new(n, n, audio.sample_rate);
+        let keep = ((max_hz * 1.2 * 2.0 / audio.sample_rate as f64 * n as f64) as usize + 4).min(n / 2 + 1);
+        let mut rows = Vec::new();
+        let mut start = 0;
+        loop {
+            rows.push(fft.power(&audio.samples, start as i64)[..keep].iter().map(|&x| x as f32).collect());
+            start += n / 4;
+            if start + n > audio.samples.len() {
+                break;
             }
-            Aggregate::Percentile(_) => stored.push(p.into_iter().map(|x| x as f32).collect()),
         }
-    });
-    let Aggregate::Percentile(pct) = agg else {
-        sum.iter_mut().for_each(|a| *a /= frames as f64);
-        return (sum, bin_hz);
-    };
-    let k = ((pct / 100.0 * (frames - 1) as f64).round() as usize).min(frames - 1);
-    let mut col = vec![0f32; frames];
-    let out = (0..stored[0].len())
-        .map(|b| {
-            col.iter_mut().zip(&stored).for_each(|(c, f)| *c = f[b]);
-            *col.select_nth_unstable_by(k, f32::total_cmp).1 as f64
-        })
-        .collect();
-    (out, bin_hz)
+        Self { rows, bin_hz: fft.bin_hz }
+    }
+
+    /// The long-term power spectrum under `agg`.
+    pub fn aggregate(&self, agg: Aggregate) -> Vec<f64> {
+        let frames = self.rows.len();
+        let bins = self.rows[0].len();
+        let Aggregate::Percentile(pct) = agg else {
+            return (0..bins).map(|b| self.rows.iter().map(|r| r[b] as f64).sum::<f64>() / frames as f64).collect();
+        };
+        let k = ((pct / 100.0 * (frames - 1) as f64).round() as usize).min(frames - 1);
+        let mut col = vec![0f32; frames];
+        (0..bins)
+            .map(|b| {
+                col.iter_mut().zip(&self.rows).for_each(|(c, r)| *c = r[b]);
+                *col.select_nth_unstable_by(k, f32::total_cmp).1 as f64
+            })
+            .collect()
+    }
 }
