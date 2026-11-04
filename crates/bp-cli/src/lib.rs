@@ -1,6 +1,7 @@
 //! Argument parsing and output only; all work happens in bp-core. Shared with bp-py's `main()`.
 
 use anyhow::{Context, Result};
+use bp_core::audio::spectrum::PeakParams;
 use bp_core::catalog::Catalog;
 use bp_core::eval::{self, Case, CorpusEntry, SimEvalConfig};
 use bp_core::geo::Region;
@@ -20,6 +21,9 @@ struct Cli {
     /// TOML overriding matcher parameters (fields of `MatchParams`).
     #[arg(long, global = true)]
     matcher: Option<PathBuf>,
+    /// TOML overriding long-term peak picking (fields of `PeakParams`).
+    #[arg(long, global = true)]
+    peaks: Option<PathBuf>,
     /// Line extraction: long_term | blows (experimental).
     #[arg(long, global = true, value_parser = parse_enum::<Extraction>, default_value = "long_term")]
     extraction: Extraction,
@@ -121,8 +125,8 @@ fn sim_params(a: &SimArgs) -> SimParams {
     }
 }
 
-fn match_params(path: Option<&PathBuf>) -> Result<MatchParams> {
-    let Some(p) = path else { return Ok(MatchParams::default()) };
+fn toml_params<T: Default + serde::de::DeserializeOwned>(path: Option<&PathBuf>) -> Result<T> {
+    let Some(p) = path else { return Ok(T::default()) };
     let text = std::fs::read_to_string(p).with_context(|| format!("reading {}", p.display()))?;
     Ok(toml::from_str(&text)?)
 }
@@ -146,9 +150,9 @@ fn emit(title: &str, cases: &[Case], out: Option<PathBuf>) -> Result<()> {
 pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
     let cli = Cli::parse_from(args);
     let catalog = Catalog::load_or_embedded(cli.dove.as_deref()).context("loading Dove data (see --dove)")?;
-    let matcher = match_params(cli.matcher.as_ref())?;
     let base = LocateOptions {
-        matcher,
+        matcher: toml_params::<MatchParams>(cli.matcher.as_ref())?,
+        peaks: toml_params::<PeakParams>(cli.peaks.as_ref())?,
         extraction: cli.extraction,
         auto_window: cli.auto_window,
         ..LocateOptions::default()

@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Extraction {
-    /// Peaks of the clip's mean spectrum: everything tonal, bells or not.
+    /// Peaks of the clip's long-term (per-bin percentile) spectrum: everything tonal, bells or not.
     #[default]
     LongTerm,
     /// Experimental: lines that rise at blows and recur, snapped to the long-term spectrum.

@@ -1,0 +1,2 @@
+# Peak-picking override for `bellprint --peaks`: the pre-percentile Welch-mean long-term spectrum.
+aggregate = "mean"

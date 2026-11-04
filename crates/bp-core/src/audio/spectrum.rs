@@ -1,6 +1,7 @@
 use super::Audio;
+use super::longterm::{Aggregate, long_term_power};
 use realfft::RealFftPlanner;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// A spectral line in the clip's long-term spectrum.
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -10,7 +11,8 @@ pub struct Peak {
     pub prominence_db: f64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, deny_unknown_fields)]
 pub struct PeakParams {
     pub window_s: f64,
     pub min_hz: f64,
@@ -19,6 +21,7 @@ pub struct PeakParams {
     pub max_peaks: usize,
     /// Half-width of the moving median that defines the floor.
     pub floor_half_width_cents: f64,
+    pub aggregate: Aggregate,
 }
 
 impl Default for PeakParams {
@@ -30,6 +33,7 @@ impl Default for PeakParams {
             min_prominence_db: 6.0,
             max_peaks: 80,
             floor_half_width_cents: 150.0,
+            aggregate: Aggregate::Percentile(75.0),
         }
     }
 }
@@ -67,27 +71,6 @@ impl Fft {
     }
 }
 
-/// Welch mean power spectrum (Hann, 75 % overlap). Returns (power per bin, Hz per bin).
-pub fn mean_power(audio: &Audio, window_s: f64) -> (Vec<f64>, f64) {
-    let n = ((window_s * audio.sample_rate as f64) as usize).next_power_of_two();
-    let mut fft = Fft::new(n, n, audio.sample_rate);
-    let mut acc = vec![0.0; n / 2 + 1];
-    let mut frames = 0;
-    let mut start = 0;
-    loop {
-        for (a, p) in acc.iter_mut().zip(fft.power(&audio.samples, start as i64)) {
-            *a += p;
-        }
-        frames += 1;
-        start += n / 4;
-        if start + n > audio.samples.len() {
-            break;
-        }
-    }
-    acc.iter_mut().for_each(|a| *a /= frames as f64);
-    (acc, fft.bin_hz)
-}
-
 /// Sub-bin position of the peak at bin `k` by parabolic interpolation on dB.
 pub fn interp_bin(db: &[f64], k: usize) -> f64 {
     let (a, b, c) = (db[k - 1], db[k], db[k + 1]);
@@ -107,7 +90,7 @@ fn floor_db(db: &[f64], k: usize, bin_hz: f64, half_cents: f64) -> f64 {
 
 /// Prominent spectral lines, strongest first.
 pub fn find_peaks(audio: &Audio, p: &PeakParams) -> Vec<Peak> {
-    let (power, bin_hz) = mean_power(audio, p.window_s);
+    let (power, bin_hz) = long_term_power(audio, p.window_s, p.max_hz, p.aggregate);
     let db: Vec<f64> = power.iter().map(|x| 10.0 * (x + 1e-20).log10()).collect();
     let lo = ((p.min_hz / bin_hz) as usize).max(3);
     let hi = ((p.max_hz / bin_hz) as usize).min(db.len() - 3);

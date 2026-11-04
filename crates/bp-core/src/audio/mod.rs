@@ -1,5 +1,6 @@
 pub mod blows;
 mod decode;
+pub mod longterm;
 pub mod onsets;
 pub mod spectrum;
 pub mod window;
