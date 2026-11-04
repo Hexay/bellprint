@@ -40,6 +40,10 @@ pub struct MatchParams {
     /// Search range and prior width of a global pitch offset (playback speed, resampling).
     pub max_shift_cents: f64,
     pub shift_sigma_cents: f64,
+    /// Share and width of a narrow core in the shift prior around each known shift: most clips play at
+    /// true speed, so true rings align within a few cents (research/matcher_twins.md).
+    pub shift_core_weight: f64,
+    pub shift_core_sigma_cents: f64,
     /// Also try the shifts that common frame-rate and sample-rate mix-ups produce.
     pub resample_shifts: bool,
     /// Probability that a given bell of the ring is audible in the clip, measured on the real corpus
@@ -73,6 +77,8 @@ impl Default for MatchParams {
             nominal_sigma_cents: 5.0,
             max_shift_cents: 40.0,
             shift_sigma_cents: 15.0,
+            shift_core_weight: 0.7,
+            shift_core_sigma_cents: 6.0,
             resample_shifts: true,
             p_bell_heard: 0.7,
             background_share: 0.5,
@@ -93,17 +99,21 @@ impl Default for MatchParams {
 const KNOWN_SHIFTS: [(f64, f64); 7] =
     [(0.0, 0.70), (70.7, 0.05), (-70.7, 0.05), (146.7, 0.06), (-146.7, 0.06), (217.4, 0.04), (-217.4, 0.04)];
 
-/// Shifts to try with their log prior: a Gaussian of `shift_sigma_cents` around each known shift.
+/// Shifts to try with their log prior: around each known shift, a Gaussian of `shift_sigma_cents`
+/// mixed with a narrow core, scaled so the broad part alone peaks at the known shift's weight.
 /// Without `resample_shifts` only the one around zero, out to `max_shift_cents`.
 pub fn shift_grid(p: &MatchParams) -> Vec<(f64, f64)> {
     let step = (p.nominal_sigma_cents / 4.0).max(0.5);
     let known: &[(f64, f64)] = if p.resample_shifts { &KNOWN_SHIFTS } else { &KNOWN_SHIFTS[..1] };
+    let (c, sc, sb) = (p.shift_core_weight, p.shift_core_sigma_cents, p.shift_sigma_cents);
     let mut out = Vec::new();
     for &(mu, w) in known {
         let steps = (p.max_shift_cents / step).ceil() as i64;
         for i in -steps..=steps {
             let d = i as f64 * step;
-            out.push((mu + d, w.ln() - 0.5 * (d / p.shift_sigma_cents).powi(2)));
+            let core = c * (sb / sc) * (-0.5 * (d / sc).powi(2)).exp();
+            let broad = (1.0 - c) * (-0.5 * (d / sb).powi(2)).exp();
+            out.push((mu + d, w.ln() + (core + broad).ln()));
         }
     }
     out
