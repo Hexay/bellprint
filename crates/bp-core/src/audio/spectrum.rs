@@ -31,7 +31,8 @@ impl Default for PeakParams {
             min_hz: 60.0,
             // 98.7 % of Dove nominals lie below this; lines above it helped wrong rings more than right ones.
             max_hz: 2500.0,
-            min_prominence_db: 6.0,
+            // The matcher's background model absorbs weak chance lines; a higher cut drops faint real nominals.
+            min_prominence_db: 4.0,
             max_peaks: 80,
             floor_half_width_cents: 150.0,
             aggregate: Aggregate::Percentile(75.0),
