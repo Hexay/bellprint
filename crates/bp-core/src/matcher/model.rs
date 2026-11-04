@@ -42,8 +42,9 @@ pub struct MatchParams {
     pub shift_sigma_cents: f64,
     /// Also try the shifts that common frame-rate and sample-rate mix-ups produce.
     pub resample_shifts: bool,
-    /// Probability that a given bell of the ring is audible in the clip. Each nominal scores
-    /// ln(1 - p + p * LR), LR = Gaussian pdf of its nearest-line offset / local line density.
+    /// Probability that a given bell of the ring is audible in the clip, measured on the real corpus
+    /// (research/matcher.md). Each nominal scores ln(1 - p + p * LR), LR = Gaussian pdf of its
+    /// nearest-line offset / local line density.
     pub p_bell_heard: f64,
     /// Prior share of observed lines that come from something other than the bells.
     pub background_share: f64,
@@ -73,7 +74,7 @@ impl Default for MatchParams {
             max_shift_cents: 40.0,
             shift_sigma_cents: 15.0,
             resample_shifts: true,
-            p_bell_heard: 0.97,
+            p_bell_heard: 0.7,
             background_share: 0.5,
             band_cents: 8500.0,
             full_strength_db: 24.0,

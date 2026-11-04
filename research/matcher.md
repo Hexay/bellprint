@@ -65,7 +65,37 @@ acoustics.md founder table; see its Implications), on which main's matcher score
 
 σ 7 / 10 / 15 c gives corpus top-1 31 / 31 / 30, so the gain doesn't hinge on the width.
 
+## Misses on the era-tolerance baseline (2026-11-04)
+Fast loop: `eval-sim`/`eval-corpus --out D` also write `D/clips.json` (lines + truth); `bellprint
+[--matcher x.toml] replay D/clips.json` re-ranks them without audio and reproduces the full eval exactly.
+Decomposing the 103 corpus misses with a ranked rival (true ring vs winner at their best shifts):
+- Big rings are no longer the main winners: the winner has more bells in 30, as many in 26, **fewer in 47**.
+- The gap is in the nominal terms (median +3.8 nats to the winner) more than the line terms (+0.9).
+- Winner hits land on true nominals 397, quints 122, none 123, superquints 34, primes only 29 (of 735).
+- True rings lose by **unheard bells**: at the best shift 84 % of true nominals have a line within 3σ,
+  against 46 % for the same rings moved off-scale (±250, ±450 c). So about (0.84 − 0.46) / 0.54 ≈ 70 %
+  of bells are heard, not the assumed 97 %: each silent bell cost ln 0.03 = −3.5 nats where ln 0.3 = −1.2
+  is right. Sim rings ring every bell loudly (≈ 100 % in reach), so sim barely cares.
+
+| `p_bell_heard` | sim s1 | sim s2 | corpus top-1/5/20 |
+|---|---|---|---|
+| 0.97 (`experiments/heard_0.97.toml`) | 147 | 129 | 32 / 53 / 70 |
+| 0.9 | 147 | 129 | 34 / 56 / 71 |
+| 0.8 | 147 | 128 | 34 / 57 / 74 |
+| **0.7 (measured)** | **146** | **127** | **34 / 59 / 76** |
+
 ## Negative results
+- **Explaining away within a ring** (each nominal's LR tested against local line density plus the
+  density of the ring's other bells' partials at it, weight w): sim s1/s2 152/136 at w 0.5, but corpus
+  32/48/62 (w 0.5), 25/44/56 (w 0.97); hum and prime only, w 0.97: 30/48/67. In a diatonic ring about half
+  of the true ring's own nominals sit within 12 c of another bell's partial too (sim: 172 of 342 true
+  hits vs 217 of 389 winner hits), so it discounts true rings almost as much as rivals.
+- **Ring-size prior.** Not needed: with the true ring moved off-scale, E[1 − p + p·LR] per bell is 0.39
+  (p 0.97) / 0.56 (p 0.7), below 1, and the best-shift per-bell nominal score falls with ring size
+  (6: −0.19, 8: −0.14, 10: −0.28, 12: −0.22 nats at p 0.7). Chance hits don't favour big rings. Big
+  rings that win do so on on-scale structure (same scale, octave-related keys), which a size prior
+  can't target. Winners of 10–12 bells are over-represented against Dove's size mix, but so are
+  10–16 bell true rings in the corpus (56 of 141).
 - **Wider shift prior for tapes and LPs** (a broad Gaussian floor of weight 0.02–0.05 and σ 100–250 c
   under the resample peaks): corpus top-1 28 → 27–28, no top-5/20 gain. The grid already covers ±257 c
   continuously, and the shifted true rings (Rochdale +179, Wakefield +113, Sevenoaks −257) trail by 9–15
