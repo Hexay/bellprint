@@ -32,7 +32,8 @@ pub struct PeakParams {
 impl Default for PeakParams {
     fn default() -> Self {
         Self {
-            window_s: 0.7,
+            // 32768 samples at 44.1 kHz, the length tuned in research/extraction_ab.md §12.
+            window_s: 32768.0 / 44100.0,
             min_hz: 60.0,
             // 98.7 % of Dove nominals lie below this; lines above it helped wrong rings more than right ones.
             max_hz: 2500.0,
