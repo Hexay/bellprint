@@ -178,6 +178,9 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
                 println!("{:.1} s, {} spectral lines", report.duration_s, report.peaks.len());
+                if let (Some(c), Some(top)) = (report.confidence, report.matches.first()) {
+                    println!("confidence in the top pick: {} (lead {:.1} nats)", c.label(), top.margin);
+                }
                 for (i, m) in report.matches.iter().enumerate() {
                     let r = &m.ring;
                     println!(

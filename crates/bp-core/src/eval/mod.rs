@@ -6,6 +6,7 @@ pub use corpus::{CorpusEntry, eval_corpus, load_manifest, load_manifests, manife
 pub use replay::{Clip, replay};
 pub use sim::{SimEvalConfig, eval_sim, pick_rings};
 
+use crate::matcher::Confidence;
 use serde::Serialize;
 
 /// One evaluated recording.
@@ -20,6 +21,7 @@ pub struct Case {
     pub top_place: String,
     pub top_probability: f64,
     pub top_margin: f64,
+    pub confidence: Option<Confidence>,
     pub peaks: usize,
     pub note: String,
 }
@@ -42,6 +44,18 @@ pub fn summarize(cases: &[Case]) -> Summary {
     Summary { n: cases.len(), top1: within(1), top5: within(5), top20: within(20), median_rank }
 }
 
+/// "high 22/27, medium 13/27, low 11/87": top-1 hits over cases per confidence label.
+pub fn by_confidence(cases: &[Case]) -> String {
+    [Confidence::High, Confidence::Medium, Confidence::Low]
+        .iter()
+        .map(|&k| {
+            let with: Vec<&Case> = cases.iter().filter(|c| c.confidence == Some(k)).collect();
+            format!("{} {}/{}", k.label(), with.iter().filter(|c| c.rank == Some(1)).count(), with.len())
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Markdown table of a summary and its cases, worst first.
 pub fn markdown(title: &str, s: &Summary, cases: &[Case]) -> String {
     let pct = |k: usize| 100.0 * k as f64 / s.n.max(1) as f64;
@@ -56,6 +70,7 @@ pub fn markdown(title: &str, s: &Summary, cases: &[Case]) -> String {
         pct(s.top20),
         s.median_rank.map_or("-".into(), |r| r.to_string())
     );
+    out += &format!("top-1 by confidence: {}\n\n", by_confidence(cases));
     out += "| id | bells | rank | top pick | p | peaks | note |\n|---|---|---|---|---|---|---|\n";
     let mut sorted: Vec<&Case> = cases.iter().collect();
     sorted.sort_by_key(|c| std::cmp::Reverse(c.rank.unwrap_or(usize::MAX)));

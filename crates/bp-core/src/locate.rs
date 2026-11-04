@@ -5,7 +5,7 @@ use crate::audio::window::{Window, WindowParams, concat, ringing_windows};
 use crate::catalog::Catalog;
 use crate::geo::Region;
 use crate::matcher::model::cents;
-use crate::matcher::{Match, MatchParams, rank_rings};
+use crate::matcher::{Confidence, Match, MatchParams, rank_rings, top_confidence};
 use serde::{Deserialize, Serialize};
 
 /// How spectral lines are taken from the clip.
@@ -62,6 +62,8 @@ pub struct Report {
     pub band_hz: (f64, f64),
     pub peaks: Vec<Peak>,
     pub matches: Vec<Match>,
+    /// Confidence in the top match, by its margin; `None` without matches.
+    pub confidence: Option<Confidence>,
 }
 
 const SNAP_CENTS: f64 = 15.0;
@@ -104,7 +106,18 @@ pub fn locate_audio(catalog: &Catalog, audio: &Audio, o: &LocateOptions) -> Repo
         Extraction::Blows => (o.blows.min_hz, o.blows.max_hz),
     };
     let matches = rank_rings(catalog, &peaks, band, o.region.as_ref(), &o.matcher, o.top.max(1));
-    Report { duration_s: audio.duration_s(), windows, region: o.region, extraction, blows, band_hz: band, peaks, matches }
+    let confidence = top_confidence(&matches);
+    Report {
+        duration_s: audio.duration_s(),
+        windows,
+        region: o.region,
+        extraction,
+        blows,
+        band_hz: band,
+        peaks,
+        matches,
+        confidence,
+    }
 }
 
 /// 1-based rank of the first match in `tower_id`, if it made the list.

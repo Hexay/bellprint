@@ -35,7 +35,7 @@ bellprint locate recording.mp3 --near 51.75,-1.26,20 --start 12 --end 40 --json
 | `--near lat,lon[,km]` | Only consider towers in this circle (default radius 30 km) |
 | `--start`, `--end` | Seconds of the file to analyse; pick the part where bells ring |
 | `--top N` | How many candidates to list |
-| `--json` | Full report: spectral lines, candidates, scores |
+| `--json` | Full report: spectral lines, candidates, scores, confidence |
 
 Audio is decoded natively: WAV, FLAC, MP3, AAC/M4A, Ogg Vorbis. A snapshot of Dove's data is built in; point
 `--dove` at a directory with a newer `dove.csv` and `bells.csv` to use those instead. From Python,
@@ -58,7 +58,10 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
    real clips sit within a few cents of one of them.
 4. **Rank.** List candidate towers with relative probabilities and the top candidate's margin over the next.
    The probabilities are not calibrated: too cautious on clean audio, too confident on real recordings
-   ([research/matcher.md](research/matcher.md)).
+   ([research/matcher.md](research/matcher.md)). Instead the top pick gets a coarse confidence from its
+   margin: **high** (≥ 2 nats) is right 98 % of the time on simulated recordings and 81 % on real ones,
+   **medium** (1–2) 76 % / 48 %, **low** (< 1) 37 % / 13 %. Thresholds were set on the simulation and
+   the real-recording rates are held out ([research/matcher_twins.md](research/matcher_twins.md)).
 
 Two experimental options did worse than this default and stay opt-in: `--extraction blows` (keep only lines
 that rise when a bell strikes) and `--auto-window` (analyse only the most bell-like 10 s windows).

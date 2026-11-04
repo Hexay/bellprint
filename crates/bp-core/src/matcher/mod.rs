@@ -1,6 +1,8 @@
+mod confidence;
 pub mod model;
 mod score;
 
+pub use confidence::{Confidence, HIGH_MARGIN_NATS, MEDIUM_MARGIN_NATS, top_confidence};
 use crate::audio::spectrum::Peak;
 use crate::catalog::{Catalog, Ring};
 use crate::geo::Region;

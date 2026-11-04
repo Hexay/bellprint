@@ -2,7 +2,7 @@ use super::Case;
 use crate::audio::spectrum::Peak;
 use crate::catalog::Catalog;
 use crate::locate::{LocateOptions, Report, rank_of};
-use crate::matcher::{Match, rank_rings};
+use crate::matcher::{Match, rank_rings, top_confidence};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -40,6 +40,7 @@ impl Clip {
             top_place: top.map_or(String::new(), |m| format!("{} ({})", m.ring.place, m.ring.dedication)),
             top_probability: top.map_or(0.0, |m| m.probability),
             top_margin: top.map_or(0.0, |m| m.margin),
+            confidence: top_confidence(matches),
             peaks: self.lines.len(),
             note: self.note.clone(),
         }

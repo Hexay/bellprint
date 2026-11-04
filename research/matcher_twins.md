@@ -53,6 +53,24 @@ Llandaff, St Sepulchre, Coventry to top-1); South Lopham, a tape at a large shif
 A margin ≥ 2 nats is right 98 % of the time on sim, 81 % on the corpus; below 1 nat 38 % vs 14 %. The
 two disagree under 2 nats, so no single margin → probability map is offered; ranking is unchanged.
 
+## Confidence label
+The report's `confidence` (`matcher::Confidence`) labels the top pick by its margin. Thresholds were
+picked on sim s1+s2 (400 clips) at b8ccc0d: **high** from the lowest margin above which every 0.5-nat
+bin is ≥ 95 % right (2 nats; the 1.5–2 bin is 86 %), **low** below the margin under which bins are less
+than half right (1 nat; 0.5–1 is 38 %, 1–1.5 is 66 %). The corpus was not looked at while choosing, so
+its rates are held out:
+
+| label | margin | sim s1+s2 top-1 | corpus top-1 |
+|---|---|---|---|
+| high | ≥ 2 | 157 / 160 (98 %) | 22 / 27 (81 %) |
+| medium | 1–2 | 53 / 70 (76 %) | 13 / 27 (48 %) |
+| low | < 1 | 63 / 170 (37 %) | 11 / 87 (13 %) |
+
+The label is ordered on both, but the corpus sits 17–28 points below sim at every level, so it is a
+ranking of trust, not a probability. Four of the five high-confidence corpus misses are recordings where a
+different ring really sounds (miss_triage.md). Eval summaries print the same split ("top-1 by
+confidence"); ranking is untouched (sim and corpus `cases.json` ranks identical to b8ccc0d).
+
 ## Negative results
 - **Tighter nominal σ.** At the fitted shift, true nominals sit 2.1 / 4.3 / 7.0 c from their line
   (median / 80th / 95th, n 813), which reads as σ ≈ 3.5. But `nominal_sigma_cents` 3.5 gives sim
