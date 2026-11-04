@@ -30,6 +30,20 @@ Bands often ring the back 8 of 10 or 12, or 6 of 8. `score_ring_or_subset` also 
 run that drops up to 4 bells from the front or back (keeping ≥ 5), charged `subset_log_prior` = −3. Sim
 rings are complete, so sim is neutral to it; on the corpus it adds top-1 and top-5 (`experiments/no_subsets.toml`).
 
+Prior re-check (2026-11, replay on `runs/ab-prom3` caches; sim top-1/top-5, corpus top-1/5/20) — **keep −3**:
+
+| prior | sim s1 | sim s2 | corpus |
+|---|---|---|---|
+| −3 | 144/177 | 129/169 | 46/66/80 |
+| −2 | 144/176 | 128/169 | 46/68/81 |
+| −1.5 | 144/176 | 126/169 | 48/67/82 |
+| −1 | 140/174 | 121/167 | 48/67/82 |
+
+−1.5 and −1 lose > 2 sim s2 top-1; −2 gains no corpus top-1. Rationale points the other way: 4 of 141
+corpus clips ring a modelled front/back subset (stepney-stedman, ia-coventry-cathedral-down,
+bbc-st-clement-danes, bbc-rochdale-st-chad; 7 counting B2 partial rings), spread over ≤ 8 subsets per ring:
+ln(0.03/8) ≈ −5.6 (ln(0.05/8) ≈ −5.1). −3 is already generous; the +2 at −1.5 is clip-specific.
+
 ## Remaining misses (2.5 kHz band, 4 dB lines, 113 misses)
 Per-miss decomposition (true ring vs winner at their best shifts) over the 64 misses with ≥ 75 % of true
 nominals within 8 c of a line:
