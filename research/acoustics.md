@@ -150,19 +150,13 @@ The column cents and ratios are [I] arithmetic from the fitted parameters.
 
 ## 5. Decay
 
-- Damping Q measured on a 46-bell carillon: about 4500 at low frequency, falling to about 2500 at
-  2 kHz, then rising to about 4000 at 10 kHz. Decay rates run from "a few dB/s to a few tens of dB/s",
-  rising with note pitch and partial rank [V: BD2002].
-- **[I]** For a stationary, freely ringing bell, T60 ≈ 6.91·Q/(π f) = 2.2·Q/f. That gives Q = 4500 at 250 Hz →
-  T60 ≈ 40 s, Q = 4500 at 100 Hz → ≈ 100 s, Q = 2500 at 2 kHz → ≈ 2.7 s. Q ≈ 3000 at 1 kHz (interpolated)
-  → about 7 s. So the hum (f/4) outlasts the nominal by roughly 4–8×, and the octave nominal is
-  shorter-lived again.
-- Small lab bell, single strike: 624 Hz Q = 1300, 981 Hz Q = 1000, 1310 Hz Q = 2000 [V: W2012]. That is
-  T60 ≈ 4.6, 2.2 and 3.4 s [I].
+Measured per-partial values, sources that disagree, and the sim model: see [decay.md](decay.md).
+- Free decay (BD2002 Fig. 3, read off): Q ≈ 4000 for the hum, ≈ 3000 for prime, tierce and upper
+  partials, but ≈ 1200 for the nominal. At a 1 kHz nominal: hum T60 ≈ 35 s, prime ≈ 13 s, tierce ≈ 11 s,
+  nominal ≈ 2.6 s [I]. Hibbert's test sounds (hum 13.5 s, all else 2.7 s) agree on hum and nominal only.
 - **Full-circle ringing**: the clapper bounces for about 0.8 s (small bell) to about 2 s (tenor). While it
   bounces the bell decays as if chimed. Once the clapper comes to rest against the bell, friction damps
-  the vibration "very quickly" [V: W2012]. Hibbert's synthetic test sounds model the hum decaying to 60%
-  in 1 s and all other partials to 60% in 200 ms, based on measured envelopes [V: H-PhD, PDF p.108].
+  the vibration "very quickly" [V: W2012].
 - "Hum, tierce and prime … often last for quite a while (many seconds)". Short-lived high partials are
   hard to measure with forks [V: H-basic].
 - Impure bronze deadens tone, probably because some important partials decay fast [V: H-PhD ch.4].
