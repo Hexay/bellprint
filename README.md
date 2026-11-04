@@ -44,7 +44,9 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
 
 ## How it works
 
-1. **Lines.** Average the clip's power spectrum and keep the lines that stand out from a moving-median floor.
+1. **Lines.** Take the 75th percentile of the clip's power spectrum over time, which keeps sustained bell
+   partials and damps brief noises such as speech or traffic. Keep the lines that stand out from a
+   moving-median floor.
 2. **Bell model.** Each bell predicts lines at its hum, prime, tierce, quint, nominal, superquint and octave
    nominal, with tolerances in cents from published bell measurements ([research/acoustics.md](research/acoustics.md)).
 3. **Match.** Score every Dove ring on how many of its nominals are present and how well its predicted
@@ -59,8 +61,8 @@ that rise when a bell strikes) and `--auto-window` (analyse only the most bell-l
 
 | Benchmark | Setup | Right tower first | In top 5 |
 |---|---|---|---|
-| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned | **50 %** | 78 % |
-| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **17 / 141** | 30 / 141 |
+| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned | **51 %** | 77 % |
+| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **18 / 141** | 32 / 141 |
 
 - The simulator shares no code or constants with the matcher's bell model, but it is kinder than reality: no
   reverb, no automatic gain control, and ringing for the whole clip.
