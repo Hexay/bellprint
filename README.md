@@ -9,7 +9,7 @@
 Work out which church tower you can hear in a recording, from the pitches of its bells.
 
 **Status: early research software.** On simulated recordings it puts the right tower first about seven times
-in ten; on real recordings, a little more than one time in four. See [Accuracy](#accuracy).
+in ten; on real recordings, nearly one time in three. See [Accuracy](#accuracy).
 
 ## Why the whole ring
 
@@ -54,7 +54,8 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
 3. **Match.** Score every Dove ring on how many of its nominals are present and how well its predicted
    partials explain the observed lines, compared with chance. Bands often ring only the back or front bells
    of a larger ring, so those subsets are scored too, at a small penalty. One pitch shift is fitted per clip,
-   with priors at the offsets that 44.1/48 kHz and 24/25 fps mix-ups produce.
+   with priors at the offsets that 44.1/48 kHz and 24/25 fps mix-ups produce, sharply peaked because most
+   real clips sit within a few cents of one of them.
 4. **Rank.** List candidate towers with relative probabilities and the top candidate's margin over the next.
    The probabilities are not calibrated: too cautious on clean audio, too confident on real recordings
    ([research/matcher.md](research/matcher.md)).
@@ -66,8 +67,8 @@ that rise when a bell strikes) and `--auto-window` (analyse only the most bell-l
 
 | Benchmark | Setup | Right tower first | In top 5 |
 |---|---|---|---|
-| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **74 %** | 90 % |
-| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **40 / 141** | 60 / 141 |
+| Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **72 %** | 89 % |
+| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **45 / 141** | 66 / 141 |
 
 - The simulator shares no code or constants with the matcher's bell model, but it is kinder than reality: no
   reverb, no automatic gain control, and ringing for the whole clip.
