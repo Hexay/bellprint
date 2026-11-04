@@ -1,6 +1,6 @@
 # bellprint
 
-![Three panels: the spectrum of a real recording at Oxford, St Ebbe with its bells' nominals marked; a map of the 4 towers whose tenor shares that pitch; and a map where matching the whole ring ranks St Ebbe first.](docs/img/header.png)
+![Three panels: the spectrum of a real recording at Matlock, St Giles with its bells' nominals marked; a map of the 42 towers whose tenor shares that pitch; and a map where matching the whole ring ranks St Giles first.](docs/img/header.png)
 
 [![CI](https://github.com/Hexay/bellprint/actions/workflows/ci.yml/badge.svg)](https://github.com/Hexay/bellprint/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/bellprint.svg)](https://pypi.org/project/bellprint/)

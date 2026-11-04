@@ -21,7 +21,7 @@ import numpy as np
 import soundfile as sf
 
 ROOT = Path(__file__).resolve().parent.parent
-CLIP = sys.argv[1] if len(sys.argv) > 1 else "sc-oxford-st-ebbe"
+CLIP = sys.argv[1] if len(sys.argv) > 1 else "fsg-matlock-st-giles"
 BIN = Path(os.environ.get("BELLPRINT_BIN", ROOT / "target/fastrel/bellprint"))
 OUT = ROOT / "docs/img/header.png"
 
