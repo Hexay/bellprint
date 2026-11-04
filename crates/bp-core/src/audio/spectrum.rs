@@ -39,7 +39,8 @@ impl Default for PeakParams {
             // The matcher's background model absorbs weak chance lines; a higher cut drops faint real nominals.
             // The mean's floor is smoother than a percentile's, so 3 dB clears it (research/extraction_ab.md §12).
             min_prominence_db: 3.0,
-            max_peaks: 80,
+            // At 3 dB many corpus clips fill 80; no sim clip does.
+            max_peaks: 120,
             floor_half_width_cents: 150.0,
             // Nominals die within seconds of each blow while the hum rings on, so a percentile favours the
             // hum. See research/extraction_ab.md §10.
