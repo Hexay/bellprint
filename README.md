@@ -54,7 +54,8 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
    Bells cast from 1896, when true-harmonic tuning began, get much tighter hum and prime tolerances.
 3. **Match.** Score every Dove ring on how many of its nominals are present and how well its predicted
    partials explain the observed lines, compared with chance. Bands often ring only the back or front bells
-   of a larger ring, so those subsets are scored too, at a small penalty. One pitch shift is fitted per clip,
+   of a larger ring, so those subsets are scored too, at a small penalty, as is each ring without the semitone bells and extra
+   treble that bands often leave out. One pitch shift is fitted per clip,
    with priors at the offsets that 44.1/48 kHz and 24/25 fps mix-ups produce, sharply peaked because most
    real clips sit within a few cents of one of them.
 4. **Rank.** List candidate towers with relative probabilities and the top candidate's margin over the next.
@@ -72,7 +73,7 @@ that rise when a bell strikes) and `--auto-window` (analyse only the most bell-l
 | Benchmark | Setup | Right tower first | In top 5 |
 |---|---|---|---|
 | Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **72 %** | 88 % |
-| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **46 / 141** | 66 / 141 |
+| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **47 / 141** | 68 / 141 |
 
 - The simulator shares no code or constants with the matcher's bell model, but it is kinder than reality: no
   reverb, no automatic gain control, and ringing for the whole clip.
