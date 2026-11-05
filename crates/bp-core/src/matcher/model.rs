@@ -66,8 +66,8 @@ pub struct MatchParams {
     pub shift_core_sigma_cents: f64,
     /// Also try the shifts that common frame-rate and sample-rate mix-ups produce.
     pub resample_shifts: bool,
-    /// Probability that a given bell of the ring is audible in the clip, measured on the real corpus
-    /// (research/matcher.md). Each nominal scores ln(1 - p + p * LR), LR = Gaussian pdf of its
+    /// Probability that a given bell of the ring is audible in the clip: measured ≈ 0.7 on the real
+    /// corpus, tuned jointly with `subset_log_prior` (research/matcher.md). Each nominal scores ln(1 - p + p * LR), LR = Gaussian pdf of its
     /// nearest-line offset / local line density.
     pub p_bell_heard: f64,
     /// `p_bell_heard` of semitone bells and extra trebles (Dove "6b", "2#", "0"), which bands often
@@ -110,14 +110,14 @@ impl Default for MatchParams {
             shift_core_weight: 0.7,
             shift_core_sigma_cents: 6.0,
             resample_shifts: true,
-            p_bell_heard: 0.7,
+            p_bell_heard: 0.55,
             p_optional_heard: None,
             without_optional_log_prior: Some(-0.5),
             background_share: 0.5,
             band_cents: 8500.0,
             full_strength_db: 24.0,
             shortlist: 400,
-            subset_log_prior: -3.0,
+            subset_log_prior: -2.0,
             max_bells_dropped: 4,
             min_subset_bells: 5,
             true_harmonic_from: 1896,
