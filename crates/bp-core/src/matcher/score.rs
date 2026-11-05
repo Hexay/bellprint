@@ -1,19 +1,19 @@
-use super::model::{MatchParams, PARTIALS, cents, partial_tol, ratio_cents};
+use super::model::{MatchParams, cents};
 use super::nominal::NominalPdf;
 use crate::audio::spectrum::Peak;
 use crate::catalog::Ring;
 
 /// Observed lines in cents, sorted, with strength in (0, 1].
 pub(super) struct Lines {
-    cents: Vec<f64>,
-    strength: Vec<f64>,
+    pub cents: Vec<f64>,
+    pub strength: Vec<f64>,
     /// Analysed band in cents; nothing outside it could have been seen.
     band: (f64, f64),
 }
 
 /// `v.partition_point(pred)` found by scanning up from `from`, which must not be past it: a cursor for
 /// a predicate whose threshold only rises between calls. Same index as the binary search, far cheaper.
-fn advance<T>(v: &[T], mut from: usize, pred: impl Fn(&T) -> bool) -> usize {
+pub(super) fn advance<T>(v: &[T], mut from: usize, pred: impl Fn(&T) -> bool) -> usize {
     while from < v.len() && pred(&v[from]) {
         from += 1;
     }
@@ -120,61 +120,6 @@ impl BellTerms {
     }
 }
 
-/// Every predicted partial of a set of bells, in cents.
-pub(super) struct Partials {
-    /// (cents, sigma) sorted by cents.
-    partials: Vec<(f64, f64)>,
-    max_sigma: f64,
-}
-
-impl Partials {
-    pub fn new(ring: &Ring, bells: &[usize], p: &MatchParams) -> Self {
-        let mut partials: Vec<(f64, f64)> = bells
-            .iter()
-            .flat_map(|&b| {
-                let (n, year) = (cents(ring.nominals[b]), ring.cast_years[b]);
-                PARTIALS.iter().map(move |q| {
-                    (n + ratio_cents(q.ratio), partial_tol(q, year, p).hypot(p.nominal_sigma_cents))
-                })
-            })
-            .collect();
-        partials.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let max_sigma = partials.iter().map(|x| x.1).fold(0.0, f64::max);
-        Self { partials, max_sigma }
-    }
-
-    /// Density (per cent) of these partials at `y` (already unshifted): an equal-weight Gaussian
-    /// mixture, so broad partials and big rings spread their evidence thin (Occam). `lo` is the first
-    /// partial at or above `y - 3 max_sigma`.
-    fn density(&self, lo: usize, y: f64) -> f64 {
-        let mut sum = 0.0;
-        for &(c, s) in &self.partials[lo..] {
-            let d = c - y;
-            if d > 3.0 * self.max_sigma {
-                break;
-            }
-            sum += (-0.5 * (d / s).powi(2)).exp() / (s * (std::f64::consts::TAU).sqrt());
-        }
-        sum / self.partials.len() as f64
-    }
-
-    /// Per line: log ratio of (background share + ring share) density against pure background, weighted by strength.
-    fn line_terms(&self, lines: &Lines, shift: f64, p: &MatchParams) -> f64 {
-        let a = p.background_share;
-        let mut lo = 0;
-        lines
-            .cents
-            .iter()
-            .zip(&lines.strength)
-            .map(|(&x, &w)| {
-                let y = x - shift;
-                lo = advance(&self.partials, lo, |l| l.0 < y - 3.0 * self.max_sigma);
-                w * (a + (1.0 - a) * p.band_cents * self.density(lo, y)).ln()
-            })
-            .sum()
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RingScore {
     pub score: f64,
@@ -182,22 +127,16 @@ pub(super) struct RingScore {
     pub bells_heard: usize,
 }
 
-/// Best score of `bells` over the global pitch shift. `partials` (of the same bells) adds how well
-/// they explain every observed line. `grid` is `model::shift_grid`: (shift, log prior) pairs.
-pub(super) fn score_ring(
-    terms: &BellTerms,
-    bells: &[usize],
-    partials: Option<&Partials>,
-    lines: &Lines,
-    p: &MatchParams,
-    grid: &[(f64, f64)],
-) -> RingScore {
+/// Best score of `bells` over the global pitch shift. `line_terms` (of the same bells, per grid
+/// shift; `partials::RingPartials::line_terms`) adds how well they explain every observed line.
+/// `grid` is `model::shift_grid`: (shift, log prior) pairs.
+pub(super) fn score_ring(terms: &BellTerms, bells: &[usize], line_terms: Option<&[f64]>, grid: &[(f64, f64)]) -> RingScore {
     let (total, heard) = terms.sum(bells, grid.len());
     let mut best = RingScore { score: f64::NEG_INFINITY, shift_cents: 0.0, bells_heard: 0 };
     for (g, &(shift, prior)) in grid.iter().enumerate() {
         let mut s = total[g] + prior;
-        if let Some(m) = partials {
-            s += m.line_terms(lines, shift, p);
+        if let Some(l) = line_terms {
+            s += l[g];
         }
         if s > best.score {
             best = RingScore { score: s, shift_cents: shift, bells_heard: heard[g] };
