@@ -13,6 +13,7 @@ use rayon::prelude::*;
 use partials::RingPartials;
 use score::{BellTable, Lines, RingScore, score_ring};
 use serde::Serialize;
+use std::ops::Range;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Match {
@@ -29,9 +30,10 @@ pub struct Match {
 }
 
 /// The bell sets scored for `ring`, in groups with their log prior: the whole ring and, with
-/// `without_optional_log_prior`, the ring less its optional bells. A group lists its bells first, then
-/// each contiguous run of them that drops up to `max_bells_dropped` from the back or front.
-fn bell_groups(ring: &Ring, p: &MatchParams) -> Vec<(Vec<Vec<usize>>, f64)> {
+/// `without_optional_log_prior`, the ring less its optional bells. A group lists its bells, then its
+/// runs as ranges of them: all of them first, then each contiguous run that drops up to
+/// `max_bells_dropped` from the front or back.
+fn bell_groups(ring: &Ring, p: &MatchParams) -> Vec<(Vec<usize>, Vec<Range<usize>>, f64)> {
     let all: Vec<usize> = (0..ring.nominals.len()).collect();
     let mut keeps = vec![(all.clone(), 0.0)];
     if let Some(prior) = p.without_optional_log_prior
@@ -46,11 +48,9 @@ fn bell_groups(ring: &Ring, p: &MatchParams) -> Vec<(Vec<Vec<usize>>, f64)> {
         .into_iter()
         .map(|(keep, prior)| {
             let n = keep.len();
-            let mut runs = vec![keep.clone()];
-            for d in 1..=p.max_bells_dropped.min(n.saturating_sub(p.min_subset_bells)) {
-                runs.extend([d..n, 0..n - d].map(|r| keep[r].to_vec()));
-            }
-            (runs, prior)
+            let drops = 1..=p.max_bells_dropped.min(n.saturating_sub(p.min_subset_bells));
+            let runs = std::iter::once(0..n).chain(drops.flat_map(|d| [d..n, 0..n - d])).collect();
+            (keep, runs, prior)
         })
         .collect()
 }
@@ -60,8 +60,8 @@ fn bell_groups(ring: &Ring, p: &MatchParams) -> Vec<(Vec<Vec<usize>>, f64)> {
 fn score_ring_or_subset(ring: &Ring, bells: &BellTable, lines: &Lines, p: &MatchParams, grid: &[(f64, f64)], full: bool) -> RingScore {
     let groups = bell_groups(ring, p);
     let terms = bells.ring(ring);
-    let sets: Vec<&[usize]> = groups.iter().flat_map(|g| &g.0).map(Vec::as_slice).collect();
-    let bases: Vec<_> = sets.iter().map(|b| terms.base(b, grid)).collect();
+    let sets: Vec<&[usize]> = groups.iter().flat_map(|g| g.1.iter().map(|r| &g.0[r.clone()])).collect();
+    let bases: Vec<_> = groups.iter().flat_map(|g| terms.bases(&g.0, &g.1, grid)).collect();
     let line_terms = full.then(|| {
         let partials = RingPartials::new(ring, p);
         let base: Vec<&[f64]> = bases.iter().map(|b| b.0.as_slice()).collect();
@@ -70,7 +70,7 @@ fn score_ring_or_subset(ring: &Ring, bells: &BellTable, lines: &Lines, p: &Match
     let mut line_terms = line_terms.iter().flatten().map(Vec::as_slice);
     let mut bases = bases.iter();
     let mut best = RingScore { score: f64::NEG_INFINITY, shift_cents: 0.0, bells_heard: 0 };
-    for (runs, prior) in &groups {
+    for (_, runs, prior) in &groups {
         let mut group = score_ring(bases.next().unwrap(), line_terms.next(), grid);
         for _ in &runs[1..] {
             let mut s = score_ring(bases.next().unwrap(), line_terms.next(), grid);

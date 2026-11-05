@@ -4,6 +4,7 @@ use crate::audio::spectrum::Peak;
 use crate::catalog::Ring;
 use rayon::prelude::*;
 use std::collections::HashMap;
+use std::ops::Range;
 
 /// Observed lines in cents, sorted, with strength in (0, 1].
 pub(super) struct Lines {
@@ -147,20 +148,42 @@ pub(super) struct BellTerms<'a> {
 }
 
 impl BellTerms<'_> {
-    /// Per grid shift: the terms of `bells` summed in the order given plus the shift's log prior, and
-    /// how many bells were heard.
-    pub fn base(&self, bells: &[usize], grid: &[(f64, f64)]) -> (Vec<f64>, Vec<usize>) {
-        let shifts = self.table.shifts;
-        let (mut total, mut heard) = (vec![0.0; shifts], vec![0usize; shifts]);
+    /// `Base` of each run `keep[run]`. Runs from the front of `keep` are snapshots of one running sum,
+    /// which adds in the same order as summing each alone.
+    pub fn bases(&self, keep: &[usize], runs: &[Range<usize>], grid: &[(f64, f64)]) -> Vec<Base> {
+        let zero = || (vec![0.0; self.table.shifts], vec![0usize; self.table.shifts]);
+        let mut out: Vec<Option<Base>> =
+            runs.iter().map(|r| (r.start != 0 || r.is_empty()).then(|| self.finish(self.add(zero(), &keep[r.clone()]), grid))).collect();
+        let mut sum = zero();
+        for k in 0..keep.len() {
+            sum = self.add(sum, &keep[k..=k]);
+            for (o, r) in out.iter_mut().zip(runs) {
+                if o.is_none() && r.end == k + 1 {
+                    *o = Some(self.finish(sum.clone(), grid));
+                }
+            }
+        }
+        out.into_iter().map(|b| b.expect("runs lie within keep")).collect()
+    }
+
+    fn add(&self, (mut total, mut heard): Base, bells: &[usize]) -> Base {
         for &b in bells {
             let row = &self.table.rows[self.rows[b]];
             total.iter_mut().zip(&row.terms).for_each(|(s, &t)| *s += t);
             heard.iter_mut().zip(&row.heard).for_each(|(s, &h)| *s += usize::from(h));
         }
+        (total, heard)
+    }
+
+    fn finish(&self, (mut total, heard): Base, grid: &[(f64, f64)]) -> Base {
         total.iter_mut().zip(grid).for_each(|(s, &(_, prior))| *s += prior);
         (total, heard)
     }
 }
+
+/// Per grid shift: a run's nominal terms summed in bell order plus the shift's log prior, and how
+/// many of its bells were heard.
+pub(super) type Base = (Vec<f64>, Vec<usize>);
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RingScore {
@@ -172,7 +195,7 @@ pub(super) struct RingScore {
 /// Best score of a set of bells over the global pitch shift, from its `BellTerms::base`.
 /// `line_terms` (of the same bells, per grid shift; `partials::RingPartials::line_terms`) adds how
 /// well they explain every observed line. `grid` is `model::shift_grid`: (shift, log prior) pairs.
-pub(super) fn score_ring(base: &(Vec<f64>, Vec<usize>), line_terms: Option<&[f64]>, grid: &[(f64, f64)]) -> RingScore {
+pub(super) fn score_ring(base: &Base, line_terms: Option<&[f64]>, grid: &[(f64, f64)]) -> RingScore {
     let (total, heard) = base;
     let mut best = RingScore { score: f64::NEG_INFINITY, shift_cents: 0.0, bells_heard: 0 };
     for (g, &(shift, _)) in grid.iter().enumerate() {
