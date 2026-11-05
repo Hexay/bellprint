@@ -87,7 +87,8 @@ mod tests {
             let p = MatchParams { nominal_shape: shape, nominal_t_nu: 5.0, ..Default::default() };
             assert!((integral(&p) - 1.0).abs() < 1e-3, "{shape:?}");
         }
-        let p = MatchParams { nominal_outlier_weight: 0.2, ..Default::default() };
+        let p =
+            MatchParams { nominal_shape: NominalShape::Gaussian, nominal_outlier_weight: 0.2, ..Default::default() };
         assert!((integral(&p) - 1.0).abs() < 1e-3);
     }
 

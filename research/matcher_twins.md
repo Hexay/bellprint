@@ -111,3 +111,78 @@ Hypothesis: class D twins (miss_triage.md) would separate with more precise line
 - **Narrower σ** not tried: precision did not improve, the precondition for it.
 
 Regenerate: scripts outside the repo, the procedure above on `replay` output and Dove `bells.csv`.
+
+## Nominal likelihood shape (2026-11-05): heavy tail kept, but not because the residuals are heavy
+Question: does a likelihood that matches the Dove-vs-heard error (median 2.0, p95 7.9 c) beat the 5 c
+Gaussian? Knobs: `nominal_shape` (gaussian / student_t / laplace), `nominal_t_nu`, a wide Gaussian
+mixed in (`nominal_outlier_weight`, `_sigma_cents`), `nominal_reach_sigmas` (how far a nominal may claim a
+line; was a fixed 3 σ). σ stays 5, so the shift grid step is unchanged except where σ is varied.
+
+**Fitted shape (in-sample: corpus top-1 hits only, 46 clips, 448 nominals).** Shift refit per clip, signed
+offset to the nearest line within ±40 c; each offset modelled as π·shape + (1 − π)·nearest chance line
+(Poisson at the local ±300 c line density). Even clips fit, odd clips held out:
+
+| shape | fit, all | ll all | ll odd (even fit) |
+|---|---|---|---|
+| Gaussian | σ 3.2, π 0.96 | −1233.2 | −622.8 |
+| Student-t | σ 3.1, ν 29, π 0.96 | −1233.1 | −622.9 |
+| Laplace | b 2.7, π 0.98 | −1242.8 | −624.8 |
+| Gaussian + wide | 10 % σ 1.4 + 90 % σ 3.4 | −1232.4 | −623.9 |
+
+The "heavy tail" (p95 ≈ 3.5× median) is about 4 % chance lines, not a fat Dove error. The fitted
+Student-t's ν goes to about 30, which is a Gaussian. Per-clip RMS (p10/50/90 2.1/3.1/4.2 c) matches a
+bootstrap from the pooled offsets (2.2/3.2/4.2), so there is no ring-level heterogeneity either. On misses
+(descriptive only) the fit is the same: σ 3.9, π 0.82.
+
+**Replay screen** (`replay` on `runs/ab-robust` clips, which reproduce the full evals; vs main a4b851c
+baseline sim 143/177, 129/169, corpus 47/68/82; corpus even/odd = index in clips.json):
+
+| variant | sim s1 | sim s2 | corpus all | even | odd |
+|---|---|---|---|---|---|
+| main (Gaussian σ 5, reach 3 σ) | 143/177 | 129/169 | 47/68/82 | 25/34/41 | 22/34/41 |
+| **Student-t σ 5 ν 1.5, reach 5 σ (kept)** | **145/177** | **128/167** | **49/70/86** | **26/35/41** | **23/35/45** |
+| Student-t σ 5 ν 1, reach 5 σ | 144/177 | 128/166 | 49/70/85 | 26/35/41 | 23/35/44 |
+| Student-t σ 5 ν 2, reach 5 σ | 143/177 | 127/167 | 49/69/86 | 26/34/41 | 23/35/45 |
+| Student-t σ 5 ν 2, reach 3 σ | 143/178 | 127/168 | 49/68/86 | 26/34/41 | 23/34/45 |
+| Student-t σ 5 ν 2, reach 8 σ | 142/177 | 127/167 | 49/69/86 | 26/34/41 | 23/35/45 |
+| Student-t σ 5 ν 3, reach 5 σ | 143/177 | 127/168 | 48/67/84 | 26/33/41 | 22/34/43 |
+| Gaussian σ 5 + 20 % σ 10 | 143/177 | 129/169 | 48/69/84 | 26/34/41 | 22/35/43 |
+
+Before main's optional-bell change (baseline 144/177, 129/169, 46/66/80) the other variants were screened:
+
+| variant | sim s1 | sim s2 | corpus |
+|---|---|---|---|
+| Student-t σ 5 ν 4, reach 5 σ | 143/178 | 129/168 | 46/66/82 |
+| Student-t σ 3.2 ν 30 (the fit) | 140/169 | 124/164 | 44/64/77 |
+| Student-t σ 3.5 ν 4, reach 6 σ | 142/174 | 128/168 | 46/63/81 |
+| Laplace b 2.7 (the fit), reach 6 σ | 132/163 | 117/156 | 41/60/76 |
+| Laplace b 3.5, reach 5 σ | 139/172 | 126/165 | 46/63/80 |
+| Gaussian σ 3.2 + 5 % σ 6.8 (the fit) | 140/170 | 124/166 | 45/64/78 |
+| Gaussian σ 3.5 + 20 % σ 8 | 141/174 | 126/168 | 46/64/81 |
+| Gaussian σ 5 + 10 % σ 15 | 143/177 | 130/169 | 46/66/81 |
+| Gaussian σ 5, reach 5 σ | 144/177 | 129/169 | 46/66/80 |
+| Per ring: one bell of unknown index mislisted, prior 0.3, σ 15 | 143/177 | 129/168 | 46/65/80 |
+
+- **Shapes fitted to the hits lose** (sim −4 to −12, corpus −2 to −5). Narrow is what loses: every
+  σ ≈ 3 variant falls, as σ 3.5 did before. The term has to carry more than the hits' offsets: the
+  shift is searched, not known; twins sit 2–5 c apart; and bells retuned since Dove's measurement are
+  not in a hits-only fit.
+- **What wins is a heavier tail at the same σ.** ν ≤ 2 gives +2 corpus top-1 at every reach tried, +1 in
+  each half. The density is 15 % lower at the centre and 1.2× / 7× / 9× the Gaussian at 10 / 15 / 20 c.
+  So a nominal 10–25 c off still counts for something, and the term is less peaked between twins. Reach
+  alone (Gaussian to 5 σ) changes nothing, and a light tail (ν ≥ 3, a 10–20 % wide component) gets
+  +0 to +1. ν 1.5 was picked among ν 1–2 on sim. On the corpus they tie, so this is a choice made on
+  the corpus, with only 2 clips of evidence.
+- Side effect: with the tail, silent bells pick up partial credit from chance lines up to 25 c off, so
+  subsets matter less. A clean back 6 of 8 (pipeline test) is rank 10 with or without subsets; under
+  the Gaussian term subsets still lift it. The test now checks the mechanism under the Gaussian term.
+- The per-ring "one bad bell" mixture was neutral (corpus −1 top-5) and was dropped. Per-bell
+  `p_bell_heard` already floors a mislisted bell at ln(1 − p).
+
+**Full evals of the kept default** (bit-identical ranks to the replay): sim s1 145/177, s2 128/167
+(rule floor 142/127), corpus 49/70/86 (even 26/35/41, odd 23/35/45). Corpus top-1 gained:
+belfast-st-thomas (2 → 1), stepney-stedman (3 → 1); none lost. Corpus ranks move up in 17 clips and down
+in 9 (≥ 5 ranks: reading-st-giles 14 → 5, norton-fitzwarren 19 → 9, stirling-holy-rude 29 → 15,
+wormhill 30 → 16, east-leake 21 → 13, ballarat-town-hall-grandsire out → 43; aston-cantlow 8 → 14,
+oxford-st-ebbe 12 → 18, oxton 22 → 27). Sim top-1 s1 +5 −3, s2 +3 −4. `experiments/nominal_gaussian.toml`
+restores the old term.

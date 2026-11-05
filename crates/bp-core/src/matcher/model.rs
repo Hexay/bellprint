@@ -48,7 +48,8 @@ pub fn partial_tol(q: &Partial, cast_year: Option<u16>, p: &MatchParams) -> f64 
 pub struct MatchParams {
     /// Spread between a Dove nominal and the measured line (Dove error, retuning, temperature).
     pub nominal_sigma_cents: f64,
-    /// Shape of that spread, and its Student-t degrees of freedom (`matcher::NominalShape`).
+    /// Shape of that spread, and its Student-t degrees of freedom. A heavy tail (ν 1.5) won on the
+    /// corpus though hit residuals look Gaussian (research/matcher_twins.md).
     pub nominal_shape: NominalShape,
     pub nominal_t_nu: f64,
     /// Share and width of a wide Gaussian mixed into the nominal term (mislisted or retuned bells).
@@ -99,11 +100,11 @@ impl Default for MatchParams {
     fn default() -> Self {
         Self {
             nominal_sigma_cents: 5.0,
-            nominal_shape: NominalShape::Gaussian,
-            nominal_t_nu: 4.0,
+            nominal_shape: NominalShape::StudentT,
+            nominal_t_nu: 1.5,
             nominal_outlier_weight: 0.0,
             nominal_outlier_sigma_cents: 15.0,
-            nominal_reach_sigmas: 3.0,
+            nominal_reach_sigmas: 5.0,
             max_shift_cents: 40.0,
             shift_sigma_cents: 15.0,
             shift_core_weight: 0.7,
