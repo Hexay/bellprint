@@ -57,6 +57,25 @@ const SPEC: [(f64, f64, f64); 9] = [
     (1870.0, 50.0, 0.15),
 ];
 
+/// A decaying complex oscillator: `im` is the current sample.
+#[derive(Clone, Copy)]
+struct Osc {
+    re: f64,
+    im: f64,
+    dc: f64,
+    ds: f64,
+    decay: f64,
+    stop: usize,
+}
+
+impl Osc {
+    fn step(&mut self) {
+        let r = (self.re * self.dc - self.im * self.ds) * self.decay;
+        self.im = (self.re * self.ds + self.im * self.dc) * self.decay;
+        self.re = r;
+    }
+}
+
 fn t60_for(hz: f64, size: f64) -> f64 {
     (12.0 * size * (500.0 / hz).powf(0.9)).clamp(0.4, 60.0)
 }
@@ -87,17 +106,44 @@ impl BellVoice {
         let sr = sample_rate as f64;
         let n = (dur_s * sr) as usize;
         let mut out = vec![0.0f64; n];
-        for c in self.components.iter().filter(|c| c.hz < sr * 0.45) {
-            let decay = (-6.9078 / (c.t60_s * sr)).exp();
-            let (dc, ds) = ((std::f64::consts::TAU * c.hz / sr).cos(), (std::f64::consts::TAU * c.hz / sr).sin());
-            let phase: f64 = rng.random_range(0.0..std::f64::consts::TAU);
-            let (mut re, mut im) = (phase.cos() * c.amp, phase.sin() * c.amp);
-            let stop = ((c.t60_s * sr) as usize).min(n);
-            for o in out.iter_mut().take(stop) {
-                *o += im;
-                let r = (re * dc - im * ds) * decay;
-                im = (re * ds + im * dc) * decay;
-                re = r;
+        let mut oscs: Vec<Osc> = self
+            .components
+            .iter()
+            .filter(|c| c.hz < sr * 0.45)
+            .map(|c| {
+                let decay = (-6.9078 / (c.t60_s * sr)).exp();
+                let (dc, ds) = ((std::f64::consts::TAU * c.hz / sr).cos(), (std::f64::consts::TAU * c.hz / sr).sin());
+                let phase: f64 = rng.random_range(0.0..std::f64::consts::TAU);
+                let (re, im) = (phase.cos() * c.amp, phase.sin() * c.amp);
+                Osc { re, im, dc, ds, decay, stop: ((c.t60_s * sr) as usize).min(n) }
+            })
+            .collect();
+        // Four oscillators per pass so their recurrences overlap; each sample still adds them in
+        // component order, so the sums are unchanged.
+        for chunk in oscs.chunks_mut(4) {
+            let common = chunk.iter().map(|o| o.stop).min().unwrap_or(0);
+            if let Ok(four) = <&mut [Osc; 4]>::try_from(&mut *chunk) {
+                let mut a = *four;
+                for o in out.iter_mut().take(common) {
+                    for osc in &mut a {
+                        *o += osc.im;
+                        osc.step();
+                    }
+                }
+                *four = a;
+            } else {
+                for o in out.iter_mut().take(common) {
+                    for osc in chunk.iter_mut() {
+                        *o += osc.im;
+                        osc.step();
+                    }
+                }
+            }
+            for osc in chunk.iter_mut() {
+                for o in out.iter_mut().take(osc.stop).skip(common) {
+                    *o += osc.im;
+                    osc.step();
+                }
             }
         }
         // Clapper impact: a few ms of decaying noise.
