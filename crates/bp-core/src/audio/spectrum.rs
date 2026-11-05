@@ -69,7 +69,11 @@ impl Fft {
         let plan = RealFftPlanner::<f64>::new().plan_fft_forward(n);
         let hann = (0..win).map(|i| (std::f64::consts::PI * i as f64 / win as f64).sin().powi(2)).collect();
         let (input, out) = (plan.make_input_vec(), plan.make_output_vec());
-        Self { win, plan, hann, input, out, bin_hz: sample_rate as f64 / n as f64 }
+        Self { win, plan, hann, input, out, bin_hz: Self::bin_hz(win, pad, sample_rate) }
+    }
+
+    pub fn bin_hz(win: usize, pad: usize, sample_rate: u32) -> f64 {
+        sample_rate as f64 / pad.max(win) as f64
     }
 
     /// Power spectrum of `samples[start..start + win]`; samples outside the slice count as zero.

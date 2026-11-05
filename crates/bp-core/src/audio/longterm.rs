@@ -1,5 +1,6 @@
 use super::Audio;
 use super::spectrum::Fft;
+use rayon::prelude::*;
 use serde::Deserialize;
 
 /// How per-frame power spectra combine into the long-term spectrum. In TOML: `aggregate = "mean"` or
@@ -37,18 +38,19 @@ impl Frames {
         // Not rounded to a power of two: that made the window, and the ranks, depend on the sample
         // rate. Even a 1 % length change moves ranks (research/extraction_ab.md §13).
         let n = ((window_s * audio.sample_rate as f64).round() as usize).max(8);
-        let mut fft = Fft::new(n, n, audio.sample_rate);
         let keep = ((max_hz * 1.2 * 2.0 / audio.sample_rate as f64 * n as f64) as usize + 4).min(n / 2 + 1);
-        let mut rows = Vec::new();
-        let mut start = 0;
-        loop {
-            rows.push(fft.power(&audio.samples, start as i64)[..keep].iter().map(|&x| x as f32).collect());
-            start += n / 4;
-            if start + n > audio.samples.len() {
-                break;
-            }
+        let mut starts = vec![0];
+        while starts[starts.len() - 1] + n / 4 + n <= audio.samples.len() {
+            starts.push(starts[starts.len() - 1] + n / 4);
         }
-        Self { rows, bin_hz: fft.bin_hz }
+        let rows = starts
+            .par_iter()
+            .map_init(
+                || Fft::new(n, n, audio.sample_rate),
+                |fft, &start| fft.power(&audio.samples, start as i64)[..keep].iter().map(|&x| x as f32).collect(),
+            )
+            .collect();
+        Self { rows, bin_hz: Fft::bin_hz(n, n, audio.sample_rate) }
     }
 
     /// The long-term power spectrum under `agg`.
