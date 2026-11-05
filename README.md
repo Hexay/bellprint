@@ -62,8 +62,8 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
 4. **Rank.** List candidate towers with relative probabilities and the top candidate's margin over the next.
    The probabilities are not calibrated: too cautious on clean audio, too confident on real recordings
    ([research/matcher.md](research/matcher.md)). Instead the top pick gets a coarse confidence from its
-   margin: **high** (≥ 2 nats) is right 96 % of the time on simulated recordings and 95 % on real ones,
-   **medium** (1–2) 80 % / 50 %, **low** (< 1) 36 % / 16 %. Thresholds were set on the simulation and
+   margin: **high** (≥ 2 nats) is right 97 % of the time on simulated recordings and 90 % on real ones,
+   **medium** (1–2) 77 % / 59 %, **low** (< 1) 38 % / 17 %. Thresholds were set on the simulation and
    the real-recording rates are held out ([research/matcher_twins.md](research/matcher_twins.md)).
 
 Two experimental options did worse than this default and stay opt-in: `--extraction blows` (keep only lines
@@ -74,7 +74,7 @@ that rise when a bell strikes) and `--auto-window` (analyse only the most bell-l
 | Benchmark | Setup | Right tower first | In top 5 |
 |---|---|---|---|
 | Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **72 %** | 88 % |
-| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **49 / 141** | 70 / 141 |
+| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **50 / 141** | 71 / 141 |
 
 - The simulator shares no code or constants with the matcher's bell model, but it is kinder than reality: no
   reverb, no automatic gain control, and ringing for the whole clip.
