@@ -1,0 +1,2 @@
+# Per-frame band-normalised long-term mean (research/extraction_ab.md §14).
+aggregate = "frame_normalized"

@@ -162,3 +162,56 @@ Baseline: sim s1 144/177, s2 129/169, corpus top-1/5/20 46/66/80. 48 kHz is prob
   kept 15 of 42 against p75's 8, as both halves' high percentiles sit in the same burst. Only 4 corpus
   clips reach the fallback (lyndhurst, ia-southwark-borough-market, ia-bridport-st-mary,
   ap-dublin-johns-lane) and none ranks, before or after.
+
+## 14. B1 "too little signal" clips with partial signal: diagnosis; onset / frame-normalised means (2026-11-05, on main b13e31a)
+
+Targets: miss_triage.md item 2 (tewkesbury-abbey, carlisle-cathedral, bbc-wakefield-cathedral, both
+hereford-distant uploads, giggleswick, lyndhurst, edith-weston, fsg-port-sunlight-wedding). Diagnosis
+re-implements the frames in numpy and, per Dove nominal at the best shift (±10 c of a known shift),
+reports the mean's prominence and rank, and per frame the max over ±8 c minus the ±150 c median.
+The true ring's full score comes from `locate --near <tower>,0.3`.
+
+| clip | nominals in list (null) | true score vs winner | rank if shortlisted | cause |
+|---|---|---|---|---|
+| tewkesbury-abbey | 9/14 (3.5), all at 11–25 dB, ranks 1–45 | 34.8 vs 46.9 | ≈ 200 | unrung Dove bells: 0 (cast 2020), 6 and 10 absent (6b sounds); 75 lines |
+| carlisle-cathedral | 8/13 (3.2), 14–25 dB | 23.2 vs 32.2 | ≈ 200 | 3 and 2# never sound (≤ 6 % of frames > 6 dB); 2, 4 faint (4 dB) |
+| bbc-wakefield-cathedral | 7/14 (2.0) at +8 c | 23.7 @ +114 c vs 30.6 | ≈ 100 | no consistent shift (matcher fits +114 c, p90 lines −80 c); 0, 6b, 11 absent |
+| hereford-distant (×2) | 4/10 (0.8): 684, 1404 Hz at 23–28 dB, 930 at 6 | 3.8 vs 11.6 | ≈ 300 | distance: 7 bells at chance level in every frame |
+| giggleswick | 7/8 (4.0), 21–36 dB | 38.6 vs 43.0 | 14 | none in extraction; dense list (82 lines) and the coarse shortlist |
+| lyndhurst | 3/8 (0.2), 7–13 dB | 3.6 vs 11.4 | ≈ 400 | 3 bells in a few frames (max 28–34 dB, p90 8); the other 5 never rise |
+| edith-weston | 5/6 (2.8) | 20.1 vs 20.9 | 3 | none: a near-twin miss |
+| fsg-port-sunlight-wedding | 8/8 (5.0), 10–24 dB | 26.0 vs 27.4 | 9 | none: a near-twin miss |
+
+- **These are mostly not extraction misses.** Triage's net-present is low because Dove lists bells the
+  band did not ring (extra trebles, flat/sharp semitone bells) and because 75–90-line lists push the
+  chance null to 3–5. Where a bell sounds, its nominal is a line at 10–36 dB well inside the 120 cap.
+  None of the four candidate causes binds: nothing true sits under 3 dB but over chance, the cap is
+  never reached by a true nominal (worst rank 92), and smearing would leave faint lines between 3 dB
+  and chance, of which there is one (edith-weston's 1465 Hz at 3.1 dB).
+- **Masking is non-stationary.** The mean minus its per-bin p10 or p20 (stationary-noise subtraction)
+  moves every nominal by ≤ 0.6 dB: wind, children and traffic set the floor in loud frames, not a
+  stationary spectrum. Whitening was already ruled out in §12 (the ±150 c local median cancels it).
+  Not built.
+- **Where signal is truly missing** (hereford, lyndhurst, carlisle's 3), the bells exceed chance in no
+  frame, so no aggregation can add them. Unrung bells are a matcher question (each costs ln(1 − 0.7);
+  subsets only drop from the ends, so 6b and 2# always count).
+
+Two aggregates tried behind `aggregate` (`experiments/peaks_onset.toml`, `peaks_framenorm.toml`):
+`onset_weighted` weights each frame by the summed positive rise in log 300–2500 Hz energy over its last
+4 hops; `frame_normalized` divides each frame by its median 300–2500 Hz power. Baseline: sim s1 144/177,
+s2 129/169, corpus 46/66/80.
+
+| aggregate | seed 1 | seed 2 | corpus | gained / lost top-1 |
+|---|---|---|---|---|
+| mean (main) | 144/177 | 129/169 | 46/66/80 | – |
+| `onset_weighted` | 145/175 | 127/170 | 44/60/79 | +3 (witley-close, belfast-st-thomas, ia-bournemouth-sacred-heart) / −5 (witney, oxford-lincoln-college, nottingham-st-peter, ap-bradpole, sc-wellington-old-st-pauls); ranks 19 up / 22 down |
+| `frame_normalized` | 144/176 | 132/169 | 43/64/81 | +2 (belfast-st-thomas, ia-bournemouth-sacred-heart) / −5 (witney, nottingham-st-peter, ia-lincoln-cathedral-package, ap-bradpole, bbc-st-clement-danes); 19 up / 19 down |
+
+- **Both rejected** (corpus top-1 down). No B1 target reaches top-1 under either; edith-weston 3 → 2
+  (onset) or 7 (frame-normalised), port-sunlight-wedding 9 → 10 or 8, the rest stay outside the
+  shortlist. Onset weighting raises lyndhurst's three nominals by ≈ 8 dB and edith-weston to 6/6, but
+  adds lines at the same rate, so net present does not rise anywhere.
+- Kept as non-default options for later A/B; the default mean is bit-identical (corpus ranks unchanged).
+- Item 2 of miss_triage.md recovers nothing via extraction. What might: Dove-vs-recording ring
+  membership (unrung extras, semitone bells inside the run), and the bell-terms-only coarse shortlist
+  (giggleswick would rank 14 if shortlisted).

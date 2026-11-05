@@ -51,4 +51,14 @@ fn aggregate_parses_from_toml() {
     assert_eq!(p.aggregate, Aggregate::Percentile(60.0));
     let p: PeakParams = toml::from_str("aggregate = \"mean\"").unwrap();
     assert_eq!(p.aggregate, Aggregate::Mean);
+    let p: PeakParams = toml::from_str("aggregate = \"onset_weighted\"").unwrap();
+    assert_eq!(p.aggregate, Aggregate::OnsetWeighted);
+}
+
+#[test]
+fn experimental_aggregates_keep_a_steady_tone() {
+    for agg in [Aggregate::OnsetWeighted, Aggregate::FrameNormalized] {
+        let prom = tone_prominence(0.002,&without_fallback(agg));
+        assert!(prom > 20.0, "{agg:?}: {prom:.1} dB");
+    }
 }

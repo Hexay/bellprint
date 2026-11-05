@@ -50,7 +50,7 @@ Tested by `replay` on the baseline `clips.json` (corpus +gained / −lost top-1;
 | # | fix | recoverable | evidence |
 |---|---|---|---|
 | 1 | **Location hint** (`--near`, or a geotag/metadata prior) | 40 top-1 at 30 km (D 30, E 4, A2 3, B1 2, C 1); 48 at 10 km | twins are rarely neighbours: 32 / 32 D clips rank first within 10 km. Nothing in the audio separates them at today's line precision. Report a `--near 30` benchmark alongside the no-hint one |
-| 2 | Noise-robust extraction on the 8 B1 clips with partial signal (net ≥ 30 %: tewkesbury, carlisle, wakefield, hereford, giggleswick, lyndhurst, edith-weston, port-sunlight-wedding) | ≤ 8 | the remaining 12 B1 clips are at chance (binaural Dorchester ×2, trains at Southwark ×2, bridport soundwalk, distant/one-bell clips); no line list can fix them |
+| 2 | Noise-robust extraction on the 8 B1 clips with partial signal (net ≥ 30 %: tewkesbury, carlisle, wakefield, hereford, giggleswick, lyndhurst, edith-weston, port-sunlight-wedding) | 0 by extraction (extraction_ab.md §14: nominals of rung bells are already lines; misses are unrung Dove bells, distance, near twins) | the remaining 12 B1 clips are at chance (binaural Dorchester ×2, trains at Southwark ×2, bridport soundwalk, distant/one-bell clips); no line list can fix them |
 | 3 | Subset prior `subset_log_prior` −3 → −1.5 | +2 / −0 (stepney-stedman, ia-bournemouth) | sim s1 144 → 144; needs sim s2 before adopting |
 | 4 | `p_bell_heard` 0.7 → 0.5 | +3 / −1 | sim s1 142; borderline under the A/B rule |
 | 5 | Corpus labels: exclude or tag A1–A3 in the benchmark (report top-1 of 112 matchable) | 0 recovered, 29 removed from the denominator | data, not code |
