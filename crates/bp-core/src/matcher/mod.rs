@@ -11,7 +11,7 @@ use crate::geo::Region;
 pub use model::{MatchParams, NominalShape};
 use rayon::prelude::*;
 use partials::RingPartials;
-use score::{BellTerms, Lines, RingScore, score_ring};
+use score::{BellTable, Lines, RingScore, score_ring};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -57,9 +57,9 @@ fn bell_groups(ring: &Ring, p: &MatchParams) -> Vec<(Vec<Vec<usize>>, f64)> {
 
 /// Best score over `bell_groups`, runs charged `subset_log_prior` and groups their prior. `full`
 /// adds how well each run explains every observed line.
-fn score_ring_or_subset(ring: &Ring, lines: &Lines, p: &MatchParams, grid: &[(f64, f64)], full: bool) -> RingScore {
+fn score_ring_or_subset(ring: &Ring, bells: &BellTable, lines: &Lines, p: &MatchParams, grid: &[(f64, f64)], full: bool) -> RingScore {
     let groups = bell_groups(ring, p);
-    let terms = BellTerms::new(ring, lines, grid, p);
+    let terms = bells.ring(ring);
     let line_terms = full.then(|| {
         let partials = RingPartials::new(ring, p);
         let sets: Vec<&[usize]> = groups.iter().flat_map(|g| &g.0).map(Vec::as_slice).collect();
@@ -98,18 +98,19 @@ pub fn rank_rings(
     let grid = model::shift_grid(p);
     let candidates: Vec<&Ring> =
         catalog.rings.iter().filter(|r| region.is_none_or(|g| g.contains(r.lat, r.lon))).collect();
+    let bells = BellTable::new(&candidates, &lines, &grid, p);
 
     let mut coarse: Vec<(usize, f64)> = candidates
         .par_iter()
         .enumerate()
-        .map(|(i, r)| (i, score_ring_or_subset(r, &lines, p, &grid, false).score))
+        .map(|(i, r)| (i, score_ring_or_subset(r, &bells, &lines, p, &grid, false).score))
         .collect();
     coarse.sort_by(|a, b| b.1.total_cmp(&a.1));
     coarse.truncate(p.shortlist);
 
     let mut full: Vec<(usize, RingScore)> = coarse
         .par_iter()
-        .map(|&(i, _)| (i, score_ring_or_subset(candidates[i], &lines, p, &grid, true)))
+        .map(|&(i, _)| (i, score_ring_or_subset(candidates[i], &bells, &lines, p, &grid, true)))
         .collect();
     full.sort_by(|a, b| b.1.score.total_cmp(&a.1.score));
 
