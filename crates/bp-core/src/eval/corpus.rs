@@ -1,5 +1,6 @@
 use super::{Case, Clip};
 use crate::audio::Audio;
+use crate::audio::resample::resample;
 use crate::catalog::Catalog;
 use crate::locate::{LocateOptions, locate_audio};
 use anyhow::{Context, Result};
@@ -55,17 +56,23 @@ pub fn manifest_toml(entries: Vec<CorpusEntry>) -> Result<String> {
     Ok(toml::to_string(&Manifest { recording: entries })?)
 }
 
-/// Locates every entry with audio at `<audio_dir>/<id>.flac`; entries without audio are skipped.
+/// Locates every entry with audio at `<audio_dir>/<id>.flac`, resampled to `resample_hz` if given (a
+/// robustness probe); entries without audio are skipped.
 pub fn eval_corpus(
     catalog: &Catalog,
     entries: &[CorpusEntry],
     audio_dir: &Path,
+    resample_hz: Option<u32>,
     opts: &LocateOptions,
 ) -> Vec<(Case, Clip)> {
     entries
         .par_iter()
         .filter_map(|e| {
             let audio = Audio::load(&audio_dir.join(format!("{}.flac", e.id))).ok()?;
+            let audio = match resample_hz {
+                Some(hz) => resample(&audio, hz),
+                None => audio,
+            };
             let report = locate_audio(catalog, &audio, opts);
             let note = format!("{} {} {:.0}s", e.ringing, e.confidence, audio.duration_s());
             let clip = Clip::new(e.id.clone(), e.tower_id, e.bells as usize, &report, note);

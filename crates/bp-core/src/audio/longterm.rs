@@ -21,9 +21,11 @@ pub struct Frames {
 }
 
 impl Frames {
-    /// Frames up to `max_hz` (plus margin for the floor estimate).
+    /// Frames of `window_s` up to `max_hz`, plus margin for the floor estimate.
     pub fn new(audio: &Audio, window_s: f64, max_hz: f64) -> Self {
-        let n = ((window_s * audio.sample_rate as f64) as usize).next_power_of_two();
+        // Not rounded to a power of two: that made the window, and the ranks, depend on the sample
+        // rate. Even a 1 % length change moves ranks (research/extraction_ab.md §13).
+        let n = ((window_s * audio.sample_rate as f64).round() as usize).max(8);
         let mut fft = Fft::new(n, n, audio.sample_rate);
         let keep = ((max_hz * 1.2 * 2.0 / audio.sample_rate as f64 * n as f64) as usize + 4).min(n / 2 + 1);
         let mut rows = Vec::new();

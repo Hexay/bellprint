@@ -23,8 +23,8 @@ pub struct PeakParams {
     pub floor_half_width_cents: f64,
     pub aggregate: Aggregate,
     /// Below this many lines `aggregate` has missed the bells (masked by loud intermittent noise, or
-    /// sounding in too few frames); the `sparse_fallback` aggregates are tried in order and the one
-    /// giving the most lines is kept.
+    /// sounding in too few frames); of it and the `sparse_fallback` aggregates, the one with the highest
+    /// prominence-weighted line count is kept (the first on a tie).
     pub sparse_min_lines: usize,
     pub sparse_fallback: Vec<Aggregate>,
 }
@@ -32,7 +32,8 @@ pub struct PeakParams {
 impl Default for PeakParams {
     fn default() -> Self {
         Self {
-            window_s: 0.7,
+            // 32768 samples at 44.1 kHz, the length tuned in research/extraction_ab.md §12.
+            window_s: 32768.0 / 44100.0,
             min_hz: 60.0,
             // 98.7 % of Dove nominals lie below this; lines above it helped wrong rings more than right ones.
             max_hz: 2500.0,
@@ -105,18 +106,28 @@ fn floor_db(db: &[f64], k: usize, bin_hz: f64, half_cents: f64) -> f64 {
 /// Prominent spectral lines of the long-term spectrum, strongest first.
 pub fn find_peaks(audio: &Audio, p: &PeakParams) -> Vec<Peak> {
     let frames = Frames::new(audio, p.window_s, p.max_hz);
-    let mut peaks = pick_peaks(&frames.aggregate(p.aggregate), frames.bin_hz, p);
+    let peaks = pick_peaks(&frames.aggregate(p.aggregate), frames.bin_hz, p);
+    if peaks.len() >= p.sparse_min_lines || p.sparse_fallback.is_empty() {
+        return peaks;
+    }
+    let mut best = (soft_count(&peaks, p), peaks);
     for &agg in &p.sparse_fallback {
-        if peaks.len() >= p.sparse_min_lines {
-            break;
-        }
         let alt = pick_peaks(&frames.aggregate(agg), frames.bin_hz, p);
-        if alt.len() > peaks.len() {
-            peaks = alt;
+        let score = soft_count(&alt, p);
+        if score > best.0 {
+            best = (score, alt);
         }
     }
-    peaks
+    best.1
 }
+
+/// Line count where a line counts in proportion to its height above the cut, fully from
+/// `SURE_LINE_DB` up. Chance ripple of a noisy floor barely clears the cut; tones stand far above it.
+fn soft_count(peaks: &[Peak], p: &PeakParams) -> f64 {
+    peaks.iter().map(|x| ((x.prominence_db - p.min_prominence_db) / SURE_LINE_DB).min(1.0)).sum()
+}
+
+const SURE_LINE_DB: f64 = 10.0;
 
 fn pick_peaks(power: &[f64], bin_hz: f64, p: &PeakParams) -> Vec<Peak> {
     let db: Vec<f64> = power.iter().map(|x| 10.0 * (x + 1e-20).log10()).collect();

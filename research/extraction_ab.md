@@ -112,7 +112,7 @@ gains. Baseline: sim s1 147/181, s2 128/172, corpus top-1/5/20 40/60/76.
   floor ripple faster than nominals.
 - **Fallback test fixture.** At 3 dB the line-count fallback picks p90 over p75 on the synthetic
   burst in `tests/longterm.rs`: p90 lies inside the burst and its ripple lines out-count eight true tones.
-  The test pins 4 dB. On the corpus the 3 dB run is measured end to end; the fallback's two ranked
+  The test pins 4 dB (un-pinned in §13). On the corpus the 3 dB run is measured end to end; the fallback's two ranked
   clips at 4 dB now get ≥ 20 lines from the mean (ia-inveraray-distant 17 → 25 lines, rank 2 → 3;
   ap-kirkbymoorside-chime 16 → 28, 4 → 8). A criterion less sensitive to ripple (summed or capped prominence) is untested.
 - **Window.** All 151 corpus files are 44.1 kHz, so `window_s` 0.7 rounds to 32768 samples = 0.74 s,
@@ -122,7 +122,7 @@ gains. Baseline: sim s1 147/181, s2 128/172, corpus top-1/5/20 40/60/76.
   (~1 Hz) are unresolved at any length tried and merge into one beating peak. 0.37 s (2.7 Hz bins) merges
   low partials and costs 7 top-1; 1.49 s (0.67 Hz) splits doublets and halves the frames in the mean,
   costing 2 top-1. Gotcha: at 48 kHz, 0.7 s rounds up to 65536 samples (1.37 s); untested on the corpus
-  since no clip is 48 kHz.
+  since no clip is 48 kHz (fixed in §13).
 - **Trebles are under-recovered, but not for lack of floor slope.** At the best global shift and 5 c,
   true nominals have a line in 70 % of treble-half and 73 % of tenor-half cases, against 60 % and 52 %
   when each clip's lines are scored against another clip's ring. Correcting for chance,
@@ -136,3 +136,29 @@ gains. Baseline: sim s1 147/181, s2 128/172, corpus top-1/5/20 40/60/76.
   density is already near the chance ceiling (chance hit rate 0.63–0.67), and the tilt boosts every upper
   partial and noise line there as much as the faint trebles. Recovering trebles needs a cleaner high
   band (per-blow or onset-gated extraction), not a re-weighted one.
+
+## 13. Sample-rate-independent window; fallback selection (2026-11-04, on main b8ccc0d)
+
+Baseline: sim s1 144/177, s2 129/169, corpus top-1/5/20 46/66/80. 48 kHz is probed with
+`eval-corpus --resample-hz 48000` (windowed sinc, 32 zero crossings; resampled in memory, nothing written).
+
+| run | corpus 44.1 kHz | corpus at 48 kHz | sims |
+|---|---|---|---|
+| main (window rounded up to 2^k: 0.74 s at 44.1, 1.37 s at 48) | 46/66/80 | 44/60/84 | 144/177, 129/169 |
+| nearest 2^a·3^b·5^c length (0.75 s at 48, 1 % long) | 46/66/80 | 44/66/81 | – |
+| **exact length, `window_s` = 32768/44100 s** | **46/66/80** | **46/66/80** | **144/177, 129/169** |
+| **fallback by prominence-weighted count** (on top) | **46/66/80**, no clip moves | – | **144/177, 129/169** |
+
+- **Window.** The FFT length is now `round(window_s · rate)`; realfft plans any length, and 44.1 kHz
+  stays bit-identical. Old 48 kHz: line counts hit the 120 cap and 46 clips change rank. A 1 % longer
+  window still moves 46 clips (net −2 top-1): mid-ranked clips are this sensitive to the frame
+  length, so it must not vary with the rate. With the exact length 4 clips move by ≤ 2 ranks, so the
+  resampler is transparent. Zero-padding was not tried: it keeps the window but narrows the bins,
+  which changes the ±2-bin peak rule; resampling to a fixed rate costs a pass over every clip.
+- **Fallback.** Counting lines lets a noisy aggregate win on ripple that just clears the cut. A line
+  now counts (prominence − cut)/10 dB, capped at 1. On the `tests/longterm.rs` burst at 3 dB: p75
+  8 lines at 53–55 dB (score 8), p90 42 lines all ≤ 5 dB (≈ 1), mean 10 at ≈ 3 dB (≈ 0). Tried first:
+  counting lines that recur in both of two interleaved halves of the frames (blocks of 4); p90 still
+  kept 15 of 42 against p75's 8, as both halves' high percentiles sit in the same burst. Only 4 corpus
+  clips reach the fallback (lyndhurst, ia-southwark-borough-market, ia-bridport-st-mary,
+  ap-dublin-johns-lane) and none ranks, before or after.

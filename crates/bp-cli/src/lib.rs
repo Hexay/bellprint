@@ -106,6 +106,9 @@ enum Cmd {
         manifest: PathBuf,
         #[arg(long, default_value = "data/corpus/audio")]
         audio: PathBuf,
+        /// Resample every clip to this rate before locating (sample-rate robustness check).
+        #[arg(long)]
+        resample_hz: Option<u32>,
         #[arg(long)]
         out: Option<PathBuf>,
     },
@@ -222,11 +225,11 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
             std::fs::write(out.join("manifest.toml"), eval::manifest_toml(entries)?)?;
             println!("wrote {n} recordings to {}", out.display());
         }
-        Cmd::EvalCorpus { manifest, audio, out } => {
+        Cmd::EvalCorpus { manifest, audio, resample_hz, out } => {
             let entries =
                 if manifest.is_dir() { eval::load_manifests(&manifest)? } else { eval::load_manifest(&manifest)? };
             let (cases, clips): (Vec<_>, Vec<_>) =
-                eval::eval_corpus(&catalog, &entries, &audio, &eval_opts).into_iter().unzip();
+                eval::eval_corpus(&catalog, &entries, &audio, resample_hz, &eval_opts).into_iter().unzip();
             emit("Real corpus", &cases, Some(&clips), out)?;
         }
         Cmd::Replay { clips, out } => {
