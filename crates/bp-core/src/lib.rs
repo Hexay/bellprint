@@ -4,6 +4,7 @@ pub mod audio;
 pub mod catalog;
 pub mod eval;
 pub mod geo;
+pub mod geotag;
 pub mod locate;
 pub mod matcher;
 pub mod sim;

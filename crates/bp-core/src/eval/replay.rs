@@ -52,7 +52,7 @@ pub fn replay(catalog: &Catalog, clips: &[Clip], opts: &LocateOptions) -> Vec<Ca
     clips
         .par_iter()
         .map(|c| {
-            let region = opts.region.as_ref();
+            let region = opts.location.region.as_ref();
             c.case(&rank_rings(catalog, &c.peaks(), c.band_hz, region, &opts.matcher, opts.top.max(1)))
         })
         .collect()
