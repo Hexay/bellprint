@@ -60,17 +60,20 @@ fn bell_groups(ring: &Ring, p: &MatchParams) -> Vec<(Vec<Vec<usize>>, f64)> {
 fn score_ring_or_subset(ring: &Ring, bells: &BellTable, lines: &Lines, p: &MatchParams, grid: &[(f64, f64)], full: bool) -> RingScore {
     let groups = bell_groups(ring, p);
     let terms = bells.ring(ring);
+    let sets: Vec<&[usize]> = groups.iter().flat_map(|g| &g.0).map(Vec::as_slice).collect();
+    let bases: Vec<_> = sets.iter().map(|b| terms.base(b, grid)).collect();
     let line_terms = full.then(|| {
         let partials = RingPartials::new(ring, p);
-        let sets: Vec<&[usize]> = groups.iter().flat_map(|g| &g.0).map(Vec::as_slice).collect();
-        partials.line_terms(&partials.runs(&sets, ring.nominals.len()), lines, grid, p)
+        let base: Vec<&[f64]> = bases.iter().map(|b| b.0.as_slice()).collect();
+        partials.line_terms(&partials.runs(&sets, ring.nominals.len()), lines, grid, &base, p)
     });
     let mut line_terms = line_terms.iter().flatten().map(Vec::as_slice);
+    let mut bases = bases.iter();
     let mut best = RingScore { score: f64::NEG_INFINITY, shift_cents: 0.0, bells_heard: 0 };
     for (runs, prior) in &groups {
-        let mut group = score_ring(&terms, &runs[0], line_terms.next(), grid);
-        for run in &runs[1..] {
-            let mut s = score_ring(&terms, run, line_terms.next(), grid);
+        let mut group = score_ring(bases.next().unwrap(), line_terms.next(), grid);
+        for _ in &runs[1..] {
+            let mut s = score_ring(bases.next().unwrap(), line_terms.next(), grid);
             s.score += p.subset_log_prior;
             if s.score > group.score {
                 group = s;

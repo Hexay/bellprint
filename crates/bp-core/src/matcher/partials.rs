@@ -1,6 +1,7 @@
 use super::model::{MatchParams, PARTIALS, cents, partial_tol, ratio_cents};
 use super::score::{Lines, advance};
 use crate::catalog::Ring;
+use std::ops::Range;
 
 struct Partial {
     cents: f64,
@@ -26,6 +27,24 @@ pub(super) struct Runs {
 /// Every predicted partial of every bell of a ring, in cents, sorted.
 pub(super) struct RingPartials {
     partials: Vec<Partial>,
+}
+
+/// Grid shifts bounded together when pruning.
+const BLOCK: usize = 8;
+/// Slack (nats) on pruning decisions, far above the float error of a score yet far below any gap that
+/// matters: a shift is skipped only when its bound is this much below an exact score.
+const PRUNE_SLACK: f64 = 1e-6;
+/// Slack (cents) on bounding distances, against rounding in `x - shift`.
+const CENTS_SLACK: f64 = 1e-6;
+
+/// Shared per-call constants of the line term w · ln(a + scale · sum / count).
+struct Terms<'a> {
+    runs: &'a Runs,
+    lines: &'a Lines,
+    a: f64,
+    scale: f64,
+    ln_a: f64,
+    reach: f64,
 }
 
 impl RingPartials {
@@ -64,125 +83,132 @@ impl RingPartials {
 
     /// Per run, per grid shift: each line's log ratio of (background share + run share) density
     /// against pure background, weighted by strength and summed. Big runs and broad partials spread
-    /// their evidence thin (Occam). Each partial's Gaussian is computed once per line and shift and
-    /// shared by the runs that reach it; every run sums the same floats in the same order as if it
-    /// were scored alone.
-    pub fn line_terms(&self, runs: &Runs, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams) -> Vec<Vec<f64>> {
+    /// their evidence thin (Occam). `base` is each run's other score terms per shift; shifts whose
+    /// upper bound can't reach the run's best `base + line term` are left at -inf. The rest are exact:
+    /// every run sums the same floats in the same order as if it were scored alone.
+    pub fn line_terms(&self, runs: &Runs, lines: &Lines, grid: &[(f64, f64)], base: &[&[f64]], p: &MatchParams) -> Vec<Vec<f64>> {
         let a = p.background_share;
-        let (scale, ln_a) = ((1.0 - a) * p.band_cents, a.ln());
-        let n = runs.count.len();
         let reach = runs.reaches.iter().map(|r| r.0).fold(0.0, f64::max);
-        let mut out = vec![vec![0.0; grid.len()]; n];
-        let (mut acc, mut sums, mut terms) = (vec![0.0; n], vec![0.0; n], vec![0.0; n]);
-        for (g, &(shift, _)) in grid.iter().enumerate() {
-            acc.fill(-0.0);
-            let mut lo = 0;
-            for (&x, &w) in lines.cents.iter().zip(&lines.strength) {
-                let y = x - shift;
-                lo = advance(&self.partials, lo, |q| q.cents < y - reach);
-                sums.fill(0.0);
-                for q in &self.partials[lo..] {
-                    if q.cents - y > reach {
-                        break;
+        let t = Terms { runs, lines, a, scale: (1.0 - a) * p.band_cents, ln_a: a.ln(), reach };
+        let n = runs.count.len();
+        let mut out = vec![vec![f64::NEG_INFINITY; grid.len()]; n];
+        let mut best = vec![f64::NEG_INFINITY; n];
+        let score = |g: usize, active: u64, out: &mut Vec<Vec<f64>>, best: &mut Vec<f64>| {
+            self.exact(&t, grid[g].0, active, |r, v| {
+                out[r][g] = v;
+                best[r] = best[r].max(base[r][g] + v);
+            });
+        };
+        // Seed each run's best at its best shift before line terms, so most blocks prune.
+        let seeds: Vec<usize> = base.iter().map(|b| (0..b.len()).fold(0, |m, g| if b[g] > b[m] { g } else { m })).collect();
+        for (r, &g) in seeds.iter().enumerate() {
+            if !best[r].is_finite() {
+                let mask = seeds.iter().enumerate().filter(|x| *x.1 == g).fold(0u64, |m, x| m | 1 << x.0);
+                score(g, mask, &mut out, &mut best);
+            }
+        }
+        for block in blocks(grid) {
+            let (lo, hi) = (grid[block.start].0, grid[block.end - 1].0);
+            let bound = self.bound(&t, lo, hi);
+            let active = (0..n)
+                .filter(|&r| block.clone().map(|g| base[r][g]).fold(f64::NEG_INFINITY, f64::max) + bound[r] + PRUNE_SLACK >= best[r])
+                .fold(0u64, |m, r| m | 1 << r);
+            if active != 0 {
+                block.for_each(|g| score(g, active, &mut out, &mut best));
+            }
+        }
+        out
+    }
+
+    /// Exact line terms at `shift` of the `active` runs, passed to `emit(run, term)`.
+    fn exact(&self, t: &Terms, shift: f64, active: u64, mut emit: impl FnMut(usize, f64)) {
+        let n = t.runs.count.len();
+        let (mut acc, mut sums, mut terms) = (vec![-0.0; n], vec![0.0; n], vec![0.0; n]);
+        let mut lo = 0;
+        for (&x, &w) in t.lines.cents.iter().zip(&t.lines.strength) {
+            let y = x - shift;
+            lo = advance(&self.partials, lo, |q| q.cents < y - t.reach);
+            sums.fill(0.0);
+            for q in &self.partials[lo..] {
+                if q.cents - y > t.reach {
+                    break;
+                }
+                let mut m = t.runs.bell_mask[q.bell] & active;
+                for &(r, rm) in &t.runs.reaches {
+                    if q.cents < y - r || q.cents - y > r {
+                        m &= !rm;
                     }
+                }
+                if m != 0 {
                     let e = (-0.5 * ((q.cents - y) / q.sigma).powi(2)).exp() / q.norm;
-                    let mut m = runs.bell_mask[q.bell];
-                    for &(r, rm) in &runs.reaches {
-                        if q.cents < y - r || q.cents - y > r {
-                            m &= !rm;
-                        }
-                    }
                     while m != 0 {
                         sums[m.trailing_zeros() as usize] += e;
                         m &= m - 1;
                     }
                 }
-                for r in 0..n {
-                    let sum = sums[r];
-                    terms[r] = match runs.twin[r] {
-                        Some(t) if sums[t].to_bits() == sum.to_bits() => terms[t],
-                        // a + scale * 0 is exactly a.
-                        _ if sum == 0.0 => w * ln_a,
-                        _ => w * (a + scale * (sum / runs.count[r])).ln(),
-                    };
-                    acc[r] += terms[r];
-                }
             }
-            for (o, &s) in out.iter_mut().zip(&acc) {
-                o[g] = s;
+            for r in (0..n).filter(|&r| active >> r & 1 == 1) {
+                let sum = sums[r];
+                terms[r] = match t.runs.twin[r] {
+                    Some(tw) if active >> tw & 1 == 1 && sums[tw].to_bits() == sum.to_bits() => terms[tw],
+                    // a + scale * 0 is exactly a.
+                    _ if sum == 0.0 => w * t.ln_a,
+                    _ => w * (t.a + t.scale * (sum / t.runs.count[r])).ln(),
+                };
+                acc[r] += terms[r];
             }
         }
-        out
+        (0..n).filter(|&r| active >> r & 1 == 1).for_each(|r| emit(r, acc[r]));
     }
+
+    /// Per run: an upper bound on its line terms at every shift in [lo, hi]. Each partial's Gaussian
+    /// is taken at its nearest point of the line's span of unshifted positions, and every partial a
+    /// run could reach from that span counts; the log term rises with the sum.
+    fn bound(&self, t: &Terms, lo: f64, hi: f64) -> Vec<f64> {
+        let n = t.runs.count.len();
+        let (mut acc, mut sums) = (vec![0.0; n], vec![0.0; n]);
+        let mut first = 0;
+        for (&x, &w) in t.lines.cents.iter().zip(&t.lines.strength) {
+            let (y0, y1) = (x - hi - CENTS_SLACK, x - lo + CENTS_SLACK);
+            first = advance(&self.partials, first, |q| q.cents < y0 - t.reach);
+            sums.fill(0.0);
+            for q in &self.partials[first..] {
+                if q.cents > y1 + t.reach {
+                    break;
+                }
+                let mut m = t.runs.bell_mask[q.bell];
+                for &(r, rm) in &t.runs.reaches {
+                    if q.cents < y0 - r || q.cents > y1 + r {
+                        m &= !rm;
+                    }
+                }
+                let d = (y0 - q.cents).max(q.cents - y1).max(0.0);
+                let e = (-0.5 * (d / q.sigma).powi(2)).exp() / q.norm;
+                while m != 0 {
+                    sums[m.trailing_zeros() as usize] += e;
+                    m &= m - 1;
+                }
+            }
+            for r in 0..n {
+                acc[r] += if sums[r] == 0.0 { w * t.ln_a } else { w * (t.a + t.scale * (sums[r] / t.runs.count[r])).ln() };
+            }
+        }
+        acc
+    }
+}
+
+/// Up to `BLOCK` consecutive grid indices of one rising run of shifts each.
+fn blocks(grid: &[(f64, f64)]) -> Vec<Range<usize>> {
+    let mut out: Vec<Range<usize>> = Vec::new();
+    for g in 0..grid.len() {
+        match out.last_mut() {
+            Some(b) if b.len() < BLOCK && grid[g].0 > grid[g - 1].0 => b.end = g + 1,
+            _ => out.push(g..g + 1),
+        }
+    }
+    out
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::audio::spectrum::Peak;
-    use crate::catalog::Catalog;
-    use crate::matcher::model::shift_grid;
-
-    /// The per-run line terms as the matcher computed them before runs shared Gaussians.
-    fn reference(ring: &Ring, bells: &[usize], lines: &Lines, shift: f64, p: &MatchParams) -> f64 {
-        let mut partials: Vec<(f64, f64)> = bells
-            .iter()
-            .flat_map(|&b| {
-                let (n, year) = (cents(ring.nominals[b]), ring.cast_years[b]);
-                PARTIALS.iter().map(move |q| (n + ratio_cents(q.ratio), partial_tol(q, year, p).hypot(p.nominal_sigma_cents)))
-            })
-            .collect();
-        partials.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let max_sigma = partials.iter().map(|x| x.1).fold(0.0, f64::max);
-        let density = |lo: usize, y: f64| {
-            let mut sum = 0.0;
-            for &(c, s) in &partials[lo..] {
-                let d = c - y;
-                if d > 3.0 * max_sigma {
-                    break;
-                }
-                sum += (-0.5 * (d / s).powi(2)).exp() / (s * (std::f64::consts::TAU).sqrt());
-            }
-            sum / partials.len() as f64
-        };
-        let a = p.background_share;
-        let mut lo = 0;
-        lines
-            .cents
-            .iter()
-            .zip(&lines.strength)
-            .map(|(&x, &w)| {
-                let y = x - shift;
-                lo = advance(&partials, lo, |l| l.0 < y - 3.0 * max_sigma);
-                w * (a + (1.0 - a) * p.band_cents * density(lo, y)).ln()
-            })
-            .sum()
-    }
-
-    #[test]
-    fn shared_gaussians_match_per_run_scoring_bitwise() {
-        let p = MatchParams::default();
-        let grid = shift_grid(&p);
-        let catalog = Catalog::embedded();
-        let rings = catalog.rings.iter().filter(|r| r.nominals.len() >= 6).step_by(97).take(40);
-        for (i, ring) in rings.enumerate() {
-            // Lines on some of the ring's partials plus pseudo-random clutter.
-            let mut peaks: Vec<Peak> = ring.nominals.iter().step_by(2).map(|&hz| Peak { hz: hz * 1.003, prominence_db: 12.0 }).collect();
-            peaks.extend((0..60).map(|k| {
-                let u = ((k * 7919 + i * 104_729) % 1000) as f64 / 1000.0;
-                Peak { hz: 60.0 * 2f64.powf(5.3 * u), prominence_db: 3.0 + 30.0 * u }
-            }));
-            let lines = Lines::from_peaks(&peaks, p.full_strength_db, (60.0, 2500.0));
-            let n = ring.nominals.len();
-            let sets: Vec<Vec<usize>> = vec![(0..n).collect(), (1..n).collect(), (0..n - 1).collect(), (0..n - 2).collect(), (0..n).step_by(2).collect()];
-            let partials = RingPartials::new(ring, &p);
-            let refs: Vec<&[usize]> = sets.iter().map(Vec::as_slice).collect();
-            let got = partials.line_terms(&partials.runs(&refs, n), &lines, &grid, &p);
-            for (bells, got) in sets.iter().zip(&got) {
-                for (&(shift, _), &v) in grid.iter().zip(got) {
-                    assert_eq!(v.to_bits(), reference(ring, bells, &lines, shift, &p).to_bits(), "ring {}", ring.ring_id);
-                }
-            }
-        }
-    }
-}
+#[path = "partials_tests.rs"]
+mod tests;

@@ -147,8 +147,9 @@ pub(super) struct BellTerms<'a> {
 }
 
 impl BellTerms<'_> {
-    /// Per grid shift: the terms of `bells` summed in the order given, and how many were heard.
-    fn sum(&self, bells: &[usize]) -> (Vec<f64>, Vec<usize>) {
+    /// Per grid shift: the terms of `bells` summed in the order given plus the shift's log prior, and
+    /// how many bells were heard.
+    pub fn base(&self, bells: &[usize], grid: &[(f64, f64)]) -> (Vec<f64>, Vec<usize>) {
         let shifts = self.table.shifts;
         let (mut total, mut heard) = (vec![0.0; shifts], vec![0usize; shifts]);
         for &b in bells {
@@ -156,6 +157,7 @@ impl BellTerms<'_> {
             total.iter_mut().zip(&row.terms).for_each(|(s, &t)| *s += t);
             heard.iter_mut().zip(&row.heard).for_each(|(s, &h)| *s += usize::from(h));
         }
+        total.iter_mut().zip(grid).for_each(|(s, &(_, prior))| *s += prior);
         (total, heard)
     }
 }
@@ -167,14 +169,14 @@ pub(super) struct RingScore {
     pub bells_heard: usize,
 }
 
-/// Best score of `bells` over the global pitch shift. `line_terms` (of the same bells, per grid
-/// shift; `partials::RingPartials::line_terms`) adds how well they explain every observed line.
-/// `grid` is `model::shift_grid`: (shift, log prior) pairs.
-pub(super) fn score_ring(terms: &BellTerms, bells: &[usize], line_terms: Option<&[f64]>, grid: &[(f64, f64)]) -> RingScore {
-    let (total, heard) = terms.sum(bells);
+/// Best score of a set of bells over the global pitch shift, from its `BellTerms::base`.
+/// `line_terms` (of the same bells, per grid shift; `partials::RingPartials::line_terms`) adds how
+/// well they explain every observed line. `grid` is `model::shift_grid`: (shift, log prior) pairs.
+pub(super) fn score_ring(base: &(Vec<f64>, Vec<usize>), line_terms: Option<&[f64]>, grid: &[(f64, f64)]) -> RingScore {
+    let (total, heard) = base;
     let mut best = RingScore { score: f64::NEG_INFINITY, shift_cents: 0.0, bells_heard: 0 };
-    for (g, &(shift, prior)) in grid.iter().enumerate() {
-        let mut s = total[g] + prior;
+    for (g, &(shift, _)) in grid.iter().enumerate() {
+        let mut s = total[g];
         if let Some(l) = line_terms {
             s += l[g];
         }
