@@ -27,7 +27,7 @@ not modelled.
 
 ## Ring subsets
 Bands often ring the back 8 of 10 or 12, or 6 of 8. `score_ring_or_subset` also scores every contiguous
-run that drops up to 4 bells from the front or back (keeping ≥ 5), charged `subset_log_prior` = −3. Sim
+run that drops up to 4 bells from the front or back (keeping ≥ 5), charged `subset_log_prior` (−2 since the joint re-tune below; was −3). Sim
 rings are complete, so sim is neutral to it; on the corpus it adds top-1 and top-5 (`experiments/no_subsets.toml`).
 
 Under the Student-t default, subsets still help on simulated 6-of-8 (12 complete 8s, every 142nd, seeds
@@ -55,7 +55,7 @@ ln(0.03/8) ≈ −5.6 (ln(0.05/8) ≈ −5.1). −3 is already generous; the +2 
 Dove's `bells.csv` "Bell Role" marks semitone bells with a `b` / `#` suffix ("6b", "2#", "5#"; 130 bells)
 and an extra treble as "0" (31). They sit in 106 and 29 full-circle/lightweight rings. "NcM" roles
 (18 rings) are ring bell N doubling as carillon bell M, not extras. Bands usually ring the diatonic ring
-without them, and every unheard one costs ln(1 − 0.7). Subsets only drop from the ends, so an interior
+without them, and every unheard one costs ln(1 − p_bell_heard). Subsets only drop from the ends, so an interior
 semitone is always charged. 27 of 141 corpus clips come from such towers (10 already top-1). Sim rings have them in 6 (s1) and 4 (s2) clips,
 and the sim rings every listed bell, extras included. That is a slight bias against both levers below.
 Not changed, since the sim stays independent of the matcher.
@@ -192,6 +192,61 @@ Decomposing the 103 corpus misses with a ranked rival (true ring vs winner at th
 | 0.9 | 147 | 129 | 34 / 56 / 71 |
 | 0.8 | 147 | 128 | 34 / 57 / 74 |
 | **0.7 (measured)** | **146** | **127** | **34 / 59 / 76** |
+
+## Joint re-tune of the priors (2026-11-05, on main aad6218)
+`p_bell_heard`, `subset_log_prior`, `without_optional_log_prior`, `nominal_sigma_cents` and Student-t ν
+were each tuned alone under older matchers. Re-checked under the current one (Student-t term, optional
+variants, era tolerances, 6 c shift core) by `replay` on main's `eval --out` clips (replay reproduces
+the full evals). **Selected on sim s1 + s2 + corpus even-indexed clips only; corpus odd is the holdout.**
+Sim top-1/top-5 (n 200); corpus top-1/5/20.
+
+One at a time (rest at main's defaults):
+
+| variant | sim s1 | sim s2 | corpus all | even | odd |
+|---|---|---|---|---|---|
+| main (heard 0.7, subset −3, opt −0.5, σ 5, ν 1.5) | 145/177 | 128/167 | 49/70/86 | 26/35/41 | 23/35/45 |
+| heard 0.5 / 0.6 | 144/176 / 143/177 | 129/168 / 128/167 | 50/70/85 | 27/35/41 | 23/35/44 |
+| heard 0.65 / 0.75 | 143/178 / 145/178 | 129/168 / 128/166 | 49/70/85 | 26/35/41 | 23/35/44 |
+| heard 0.8 / 0.9 | 144/178 / 144/178 | 126/166 / 128/168 | 48/70/85 / 47/66/83 | 26/35/41 / 25/31/41 | 22/35/44 / 22/35/42 |
+| subset −1 | 142/175 | 123/165 | 52/70/86 | 28/35/41 | 24/35/45 |
+| subset −2 | 145/176 | 128/167 | 49/71/87 | 26/36/42 | 23/35/45 |
+| subset −4, −5, off | 145/177 | 128/167 | 49/69/85 | 26/34/40 | 23/35/45 |
+| optional 0 / −0.25 | 145/177 | 128/167 | 48/69/86 / 49/69/86 | 26/34/41 | 22/35/45 / 23/35/45 |
+| optional −1 / −1.5 / off | 145/177 | 129/167 | 48/70/85 / 47/69/85 / 47/68/84 | 25/35/41 … 25/34/41 | 23/35/44 … 22/34/43 |
+| σ 4 / 4.5 | 141/175 / 143/177 | 130/168 / 131/168 | 49/66/85 / 50/66/86 | 25/32/41 / 26/32/41 | 24/34/44 / 24/34/45 |
+| σ 5.5 / 6 / 7 | 140/177 / 138/177 / 131/168 | 130/168 / 129/168 / 126/167 | 51/69/85 / 50/68/84 / 50/69/82 | 27/34/41 / 27/33/41 / 27/32/40 | 24/35/44 / 23/35/43 / 23/37/42 |
+| ν 1 / 1.25 | 144/177 / 146/178 | 128/166 | 49/70/85 | 26/35/41 | 23/35/44 |
+| ν 2 / 3 | 143/177 | 127/167 / 127/168 | 49/69/86 / 48/67/84 | 26/34/41 / 26/33/41 | 23/35/45 / 22/34/43 |
+
+`without_optional_log_prior` −0.5 and ν 1.5 stay best. σ trades sim for corpus: 5.5+ gains corpus top-1
+(odd too) but costs sim s1 5–14; 4.5 costs corpus top-5. heard and subset move together: a lower
+heard makes a silent bell cheaper, which a subset otherwise has to buy.
+
+Grid heard × subset (σ 5, ν 1.5):
+
+| heard \ subset | −1 | −1.5 | −2 | −2.5 | −3 |
+|---|---|---|---|---|---|
+| 0.4 | 138/125, 52 (28/24) | 140/127, 51 (27/24) | 141/129, 51 (27/24) | 141/129, 51 (27/24) | 141/129, 51 (27/24) |
+| 0.5 | 142/125, 52 (28/24) | 144/127, 51 (27/24) | 144/129, 50 (27/23) | 144/129, 50 (27/23) | 144/129, 50 (27/23) |
+| **0.55** | 142/125, 52 (28/24) | 145/126, 51 (27/24) | **145/128, 50 (27/23)** | 145/128, 50 (27/23) | 145/128, 50 (27/23) |
+| 0.6 | 140/125, 52 (28/24) | 143/126, 51 (27/24) | 143/128, 50 (27/23) | 143/128, 50 (27/23) | 143/128, 50 (27/23) |
+| 0.7 | 142/123, 52 (28/24) | 145/126, 51 (27/24) | 145/128, 49 (26/23) | 145/128, 49 (26/23) | 145/128, 49 (26/23) |
+
+(sim s1/s2 top-1, corpus top-1 (even/odd).) Subset −1 gets even 28 everywhere but sim s2 falls to 123–125,
+below the floor (127): sim rings are complete, so a cheap subset only lets rivals' runs win. A further
+32-point grid (heard 0.5/0.55 × subset −1.75/−2 × σ 4.75–5.5 × ν 1.25/1.5) found no even top-1 above 27;
+σ 5.5 again bought odd top-1 (+2–3) for sim s1 −6 to −8. heard 0.55 / subset −1.75 tied on even top-1
+(27/37/42, odd 24/35/45) at sim 145/127, one below the −2 cell on the selection sum.
+
+**Kept: `p_bell_heard` 0.55, `subset_log_prior` −2** (`experiments/heard_0.7_subset_-3.toml` restores
+the old pair). Full evals, identical to the replay: sim s1 145/177, s2 128/167, corpus 50/71/87 (even
+27/36/42, odd 23/35/45). Corpus top-1 gained ia-worcester-cathedral-remembrance (3 → 1), none lost; ranks
+up in 14 clips, down in 7 (≥ 3: guildford-cathedral-tolling 16 → 5, oxton 27 → 12, wedmore-noon
+20 → 13, ballarat-town-hall-grandsire 43 → 37; westbury-muffled 7 → 10). Sim top-1 s1 +2 −2
+(+sim-3200-14, sim-1643-150; −sim-2968-47, sim-6418-118), s2 +1 −1 (+sim-6668-100; −sim-4464-107, a
+3-bell ring, 1 → out of the top 50). The gain is one even clip and the odd half is flat: a small,
+not a robust, improvement. 0.55 sits below the ≈ 0.7 measured audibility; with the heavy-tailed term
+silent bells also collect chance-line credit, so the two aren't the same quantity any more.
 
 ## Negative results
 - **Explaining away within a ring** (each nominal's LR tested against local line density plus the
