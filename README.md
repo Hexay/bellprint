@@ -33,6 +33,7 @@ bellprint locate recording.mp3 --near 51.75,-1.26,20 --start 12 --end 40 --json
 | Option | Does |
 |---|---|
 | `--near lat,lon[,km]` | Only consider towers in this circle (default radius 30 km) |
+| `--use-geotag` | Use the GPS position in the file's own metadata (MP4/MOV/M4A/3GP, FLAC) as `--near` with the default radius; `--near` wins |
 | `--start`, `--end` | Seconds of the file to analyse; pick the part where bells ring |
 | `--top N` | How many candidates to list |
 | `--json` | Full report: spectral lines, candidates, scores, confidence |
@@ -89,7 +90,7 @@ the header is drawn by `tools/readme_figure.py` from a real corpus clip.
 
 This tool can place a recording, and so the person who made it, on a map. Use it on your own recordings, on
 material published for this purpose, or with the recordist's consent. Don't use it to find, track or expose
-people.
+people. `--use-geotag` reads location metadata only from the file you pass, and only when you ask.
 
 ## Credits and data
 

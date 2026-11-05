@@ -4,7 +4,8 @@ use anyhow::{Context, Result};
 use bp_core::audio::spectrum::PeakParams;
 use bp_core::catalog::Catalog;
 use bp_core::eval::{self, Case, Clip, CorpusEntry, SimEvalConfig};
-use bp_core::geo::Region;
+use bp_core::geo::{Location, LocationSource};
+use bp_core::geotag::resolve_location;
 use bp_core::locate::{Extraction, LocateOptions, locate_audio};
 use bp_core::matcher::MatchParams;
 use bp_core::sim::{Pattern, SimParams, simulate};
@@ -54,6 +55,10 @@ enum Cmd {
         /// Restrict to a circle: "lat,lon[,radius_km]".
         #[arg(long)]
         near: Option<String>,
+        /// Restrict to a default-radius circle around the GPS position in the file's own metadata
+        /// (MP4/MOV/M4A/3GP, FLAC); `--near` wins.
+        #[arg(long)]
+        use_geotag: bool,
         #[arg(long, default_value_t = 0.0)]
         start: f64,
         #[arg(long)]
@@ -137,6 +142,16 @@ fn toml_params<T: Default + serde::de::DeserializeOwned>(path: Option<&PathBuf>)
     Ok(toml::from_str(&text)?)
 }
 
+fn print_location(l: &Location) {
+    if let (Some(r), Some(src)) = (l.region, l.location_source) {
+        let from = if src == LocationSource::Geotag { "the file's geotag" } else { "--near" };
+        println!("towers within {:.0} km of {:.5},{:.5} (from {from})", r.radius_km, r.lat, r.lon);
+    }
+    if let (Some(g), Some(LocationSource::Near)) = (l.geotag, l.location_source) {
+        println!("geotag {:.5},{:.5} found but not used: --near wins", g.lat, g.lon);
+    }
+}
+
 /// Writes the summary, and with `out` the cases and (if given) the clips' lines for `replay`.
 fn emit(title: &str, cases: &[Case], clips: Option<&[Clip]>, out: Option<PathBuf>) -> Result<()> {
     let summary = eval::summarize(cases);
@@ -169,15 +184,19 @@ pub fn run<I: IntoIterator<Item = OsString>>(args: I) -> Result<()> {
     };
     let eval_opts = LocateOptions { top: 50, ..base.clone() };
     match cli.cmd {
-        Cmd::Locate { audio, near, start, end, top, json } => {
-            let region = near.as_deref().map(Region::parse).transpose()?;
-            let opts = LocateOptions { region, top, ..base };
+        Cmd::Locate { audio, near, use_geotag, start, end, top, json } => {
+            let location = resolve_location(&audio, near.as_deref(), use_geotag)?;
+            if let Some(w) = &location.warning {
+                eprintln!("warning: {w}");
+            }
+            let opts = LocateOptions { location, top, ..base };
             let clip = bp_core::audio::Audio::load(&audio)?.slice(start, end);
             let report = locate_audio(&catalog, &clip, &opts);
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
                 println!("{:.1} s, {} spectral lines", report.duration_s, report.peaks.len());
+                print_location(&report.location);
                 if let (Some(c), Some(top)) = (report.confidence, report.matches.first()) {
                     println!("confidence in the top pick: {} (lead {:.1} nats)", c.label(), top.margin);
                 }

@@ -3,7 +3,7 @@ use crate::audio::blows::{BlowParams, struck_lines};
 use crate::audio::spectrum::{Peak, PeakParams, find_peaks};
 use crate::audio::window::{Window, WindowParams, concat, ringing_windows};
 use crate::catalog::Catalog;
-use crate::geo::Region;
+use crate::geo::Location;
 use crate::matcher::model::cents;
 use crate::matcher::{Confidence, Match, MatchParams, rank_rings, top_confidence};
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ pub enum Extraction {
 
 #[derive(Debug, Clone)]
 pub struct LocateOptions {
-    pub region: Option<Region>,
+    pub location: Location,
     pub extraction: Extraction,
     /// Analyse only the most bell-like windows of long clips. Off by default: on the real corpus it
     /// lost to the whole clip (8 vs 10 top-1 of 89).
@@ -37,7 +37,7 @@ pub struct LocateOptions {
 impl Default for LocateOptions {
     fn default() -> Self {
         Self {
-            region: None,
+            location: Location::default(),
             extraction: Extraction::default(),
             auto_window: false,
             window: WindowParams::default(),
@@ -54,7 +54,8 @@ pub struct Report {
     pub duration_s: f64,
     /// Windows analysed; empty means the whole clip.
     pub windows: Vec<Window>,
-    pub region: Option<Region>,
+    #[serde(flatten)]
+    pub location: Location,
     /// Extraction actually used (blows falls back to long-term when too few struck lines are found).
     pub extraction: Extraction,
     pub blows: usize,
@@ -105,12 +106,12 @@ pub fn locate_audio(catalog: &Catalog, audio: &Audio, o: &LocateOptions) -> Repo
         Extraction::LongTerm => (o.peaks.min_hz, o.peaks.max_hz),
         Extraction::Blows => (o.blows.min_hz, o.blows.max_hz),
     };
-    let matches = rank_rings(catalog, &peaks, band, o.region.as_ref(), &o.matcher, o.top.max(1));
+    let matches = rank_rings(catalog, &peaks, band, o.location.region.as_ref(), &o.matcher, o.top.max(1));
     let confidence = top_confidence(&matches);
     Report {
         duration_s: audio.duration_s(),
         windows,
-        region: o.region,
+        location: o.location.clone(),
         extraction,
         blows,
         band_hz: band,
