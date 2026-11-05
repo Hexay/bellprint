@@ -9,7 +9,7 @@ use crate::catalog::{Catalog, Ring};
 use crate::geo::Region;
 pub use model::{MatchParams, NominalShape};
 use rayon::prelude::*;
-use score::{Lines, RingModel, RingScore, score_ring};
+use score::{BellTerms, Lines, Partials, RingScore, score_ring};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,18 +26,27 @@ pub struct Match {
     pub distance_km: Option<f64>,
 }
 
+/// One ring's bell terms with what scoring its subsets needs; `full` adds the line terms.
+struct Scorer<'a> {
+    terms: BellTerms,
+    lines: &'a Lines,
+    p: &'a MatchParams,
+    grid: &'a [(f64, f64)],
+    full: bool,
+}
+
 /// Best score of the bells `keep` of `ring`, or of any contiguous run of them that drops up to
 /// `max_bells_dropped` from the front or back, each run charged `subset_log_prior`; all plus `prior`.
-fn score_runs(ring: &Ring, keep: &[usize], prior: f64, lines: &Lines, p: &MatchParams, grid: &[(f64, f64)], full: bool) -> RingScore {
-    let hz: Vec<f64> = keep.iter().map(|&i| ring.nominals[i]).collect();
-    let years: Vec<Option<u16>> = keep.iter().map(|&i| ring.cast_years[i]).collect();
-    let opt: Vec<bool> = keep.iter().map(|&i| ring.optional[i]).collect();
-    let n = hz.len();
-    let mut best = score_ring(&RingModel::new(&hz, &years, &opt, p), lines, p, grid, full);
+fn score_runs(ring: &Ring, keep: &[usize], prior: f64, s: &Scorer) -> RingScore {
+    let score = |run: &[usize]| {
+        let partials = s.full.then(|| Partials::new(ring, run, s.p));
+        score_ring(&s.terms, run, partials.as_ref(), s.lines, s.p, s.grid)
+    };
+    let (p, n) = (s.p, keep.len());
+    let mut best = score(keep);
     for d in 1..=p.max_bells_dropped.min(n.saturating_sub(p.min_subset_bells)) {
         for r in [d..n, 0..n - d] {
-            let m = RingModel::new(&hz[r.clone()], &years[r.clone()], &opt[r], p);
-            let mut s = score_ring(&m, lines, p, grid, full);
+            let mut s = score(&keep[r]);
             s.score += p.subset_log_prior;
             if s.score > best.score {
                 best = s;
@@ -51,14 +60,15 @@ fn score_runs(ring: &Ring, keep: &[usize], prior: f64, lines: &Lines, p: &MatchP
 /// `score_runs` of the whole ring and, with `without_optional_log_prior`, of the ring less its
 /// optional bells.
 fn score_ring_or_subset(ring: &Ring, lines: &Lines, p: &MatchParams, grid: &[(f64, f64)], full: bool) -> RingScore {
+    let scorer = Scorer { terms: BellTerms::new(ring, lines, grid, p), lines, p, grid, full };
     let all: Vec<usize> = (0..ring.nominals.len()).collect();
-    let mut best = score_runs(ring, &all, 0.0, lines, p, grid, full);
+    let mut best = score_runs(ring, &all, 0.0, &scorer);
     if let Some(prior) = p.without_optional_log_prior
         && ring.optional.contains(&true)
     {
         let core: Vec<usize> = all.into_iter().filter(|&i| !ring.optional[i]).collect();
         if !core.is_empty() {
-            let s = score_runs(ring, &core, prior, lines, p, grid, full);
+            let s = score_runs(ring, &core, prior, &scorer);
             if s.score > best.score {
                 best = s;
             }
