@@ -21,6 +21,8 @@ pub struct Ring {
     pub nominals: Vec<f64>,
     /// Cast year of each bell in `nominals`, where Dove gives one.
     pub cast_years: Vec<Option<u16>>,
+    /// Per bell in `nominals`: a semitone bell or extra treble that bands often leave out.
+    pub optional: Vec<bool>,
 }
 
 impl Ring {

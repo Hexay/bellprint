@@ -35,17 +35,6 @@ impl NominalPdf {
         }
     }
 
-    /// A plain Gaussian of `sigma`, reaching 3 sigma.
-    pub fn wide(sigma: f64) -> Self {
-        Self::new(&MatchParams {
-            nominal_sigma_cents: sigma,
-            nominal_shape: NominalShape::Gaussian,
-            nominal_outlier_weight: 0.0,
-            nominal_reach_sigmas: 3.0,
-            ..Default::default()
-        })
-    }
-
     /// `scale * pdf(d)`, multiplied in the order the Gaussian-only matcher used, so its floats are unchanged.
     pub fn scaled(&self, scale: f64, d: f64) -> f64 {
         let z = d / self.sigma;

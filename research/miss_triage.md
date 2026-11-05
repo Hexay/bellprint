@@ -62,6 +62,8 @@ Levers that recover **nothing** (corpus top-1 unchanged or worse):
   nats beyond their whole prior cost, so no prior closes them; earlier broad floors also failed
   (matcher.md).
 - Longer subsets, `max_bells_dropped` 4 → 10: B2 clips stay outside the top 50.
+- Optional semitone/extra bells (+1 corpus top-1, adopted, but no B1 clip moves) and a larger first-pass
+  shortlist (+0): matcher.md "Optional bells and the first-pass shortlist".
 - Tighter `nominal_sigma_cents` 3.5 (+2 / −4), `true_harmonic_tol_cents` 6 (+1 / −1, sim 133),
   `full_strength_db` 12 (+1 / −4), `background_share` 0.8 (+2 / −5), no line terms (+2 / −11, sim 77).
 - Large tape shifts: the previous round's "shifted-present" clips (Sevenoaks, Wakefield, Rochdale, York
