@@ -1,4 +1,5 @@
 use super::model::{MatchParams, PARTIALS, cents, partial_tol, ratio_cents};
+use super::nominal::NominalPdf;
 use crate::audio::spectrum::Peak;
 
 /// Observed lines in cents, sorted, with strength in (0, 1].
@@ -30,19 +31,17 @@ impl Lines {
         }
     }
 
-    /// Best Gaussian pdf (per cent) of the offset to a line within 3 sigma of `x`, discounted only for
-    /// faint lines: real nominals are often just 10–12 dB above the floor. `lo` is the first line at or
-    /// above `x - 3 sigma`.
-    fn best_near(&self, lo: usize, x: f64, sigma: f64) -> f64 {
-        let norm = 1.0 / (sigma * std::f64::consts::TAU.sqrt());
+    /// Best pdf (per cent) of the offset to a line within `pdf.reach` of `x`, discounted only for faint
+    /// lines: real nominals are often just 10–12 dB above the floor. `lo` is the first line at or above
+    /// `x - pdf.reach`.
+    fn best_near(&self, lo: usize, x: f64, pdf: &NominalPdf) -> f64 {
         let mut best: f64 = 0.0;
         for i in lo..self.cents.len() {
             let d = self.cents[i] - x;
-            if d > 3.0 * sigma {
+            if d > pdf.reach {
                 break;
             }
-            let s = (self.strength[i] / 0.4).min(1.0);
-            best = best.max(s * norm * (-0.5 * (d / sigma).powi(2)).exp());
+            best = best.max(pdf.scaled((self.strength[i] / 0.4).min(1.0), d));
         }
         best
     }
@@ -109,17 +108,18 @@ pub(super) struct RingScore {
 /// can ride each rising run of the grid; each shift still sums its nominals in order, so the floats
 /// are bit-identical to a shift-outer loop.
 fn bell_terms(m: &RingModel, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams) -> (Vec<f64>, Vec<usize>) {
-    let (sigma, half) = (p.nominal_sigma_cents, DENSITY_HALF_CENTS);
-    // ln(1 - p + p * 0) exactly: the term for a nominal with no line in reach.
-    let miss = (1.0 - p.p_bell_heard).ln();
+    let pdf = NominalPdf::new(p);
+    let bad = (p.ring_outlier_weight > 0.0).then(|| NominalPdf::wide(p.ring_outlier_sigma_cents));
     let mut total = vec![0.0; grid.len()];
     let mut heard = vec![0usize; grid.len()];
+    // Σ over bells of exp(bad term − good term): see MatchParams::ring_outlier_weight.
+    let mut swaps = vec![0.0; if bad.is_some() { grid.len() } else { 0 }];
     for &n in &m.nominals {
-        let (mut near, mut below, mut upto) = (0, 0, 0);
+        let (mut cur, mut cur_bad) = (Cursor::default(), Cursor::default());
         let mut prev = f64::INFINITY;
         for (g, &(shift, _)) in grid.iter().enumerate() {
             if shift < prev {
-                (near, below, upto) = (0, 0, 0);
+                (cur, cur_bad) = (Cursor::default(), Cursor::default());
             }
             prev = shift;
             let x = n + shift;
@@ -127,21 +127,45 @@ fn bell_terms(m: &RingModel, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams
             if x < lines.band.0 || x > lines.band.1 {
                 continue;
             }
-            near = advance(&lines.cents, near, |&c| c < x - 3.0 * sigma);
-            let best = lines.best_near(near, x, sigma);
-            if best == 0.0 {
-                total[g] += miss;
-                continue;
+            let (t, hit) = cur.term(lines, x, &pdf, p);
+            heard[g] += usize::from(hit);
+            total[g] += t;
+            if let Some(bad) = &bad {
+                swaps[g] += (cur_bad.term(lines, x, bad, p).0 - t).exp();
             }
-            // A hit in a crowded spectrum is weak evidence; see MatchParams::p_bell_heard.
-            below = advance(&lines.cents, below, |&c| c < x - half);
-            upto = advance(&lines.cents, upto, |&c| c <= x + half);
-            let lr = best / line_density(below, upto, half);
-            heard[g] += usize::from(lr > 1.0);
-            total[g] += (1.0 - p.p_bell_heard + p.p_bell_heard * lr).ln();
         }
     }
+    let (w, k) = (p.ring_outlier_weight, m.nominals.len() as f64);
+    for (t, s) in total.iter_mut().zip(&swaps) {
+        *t += (1.0 - w + w * s / k).ln();
+    }
     (total, heard)
+}
+
+/// Line cursors for one nominal riding a rising run of the shift grid.
+#[derive(Default)]
+struct Cursor {
+    near: usize,
+    below: usize,
+    upto: usize,
+}
+
+impl Cursor {
+    /// ln(1 - p + p LR) for a nominal at `x` (LR = pdf of its best line / local line density), and
+    /// whether LR > 1. With no line in reach that is ln(1 - p) exactly.
+    fn term(&mut self, lines: &Lines, x: f64, pdf: &NominalPdf, p: &MatchParams) -> (f64, bool) {
+        let half = DENSITY_HALF_CENTS;
+        self.near = advance(&lines.cents, self.near, |&c| c < x - pdf.reach);
+        let best = lines.best_near(self.near, x, pdf);
+        if best == 0.0 {
+            return ((1.0 - p.p_bell_heard).ln(), false);
+        }
+        // A hit in a crowded spectrum is weak evidence; see MatchParams::p_bell_heard.
+        self.below = advance(&lines.cents, self.below, |&c| c < x - half);
+        self.upto = advance(&lines.cents, self.upto, |&c| c <= x + half);
+        let lr = best / line_density(self.below, self.upto, half);
+        ((1.0 - p.p_bell_heard + p.p_bell_heard * lr).ln(), lr > 1.0)
+    }
 }
 
 /// Per line: log ratio of (background share + ring share) density against pure background, weighted by strength.

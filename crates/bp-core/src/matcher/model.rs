@@ -1,3 +1,14 @@
+/// Shape of the offset between a Dove nominal and the line heard (research/matcher_twins.md).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NominalShape {
+    Gaussian,
+    /// Student-t of scale `nominal_sigma_cents` and `nominal_t_nu` degrees of freedom.
+    StudentT,
+    /// Laplace of scale `nominal_sigma_cents`.
+    Laplace,
+}
+
 /// The matcher's model of a bell: partials as ratios of the nominal, with how far real bells stray (cents).
 /// Near true-harmonic ratios; old bells' hum, prime and quint wander, hence their wider tolerances.
 /// Tolerances follow the spread measured on the real corpus; see research/matcher.md. Too-wide partials
@@ -37,6 +48,18 @@ pub fn partial_tol(q: &Partial, cast_year: Option<u16>, p: &MatchParams) -> f64 
 pub struct MatchParams {
     /// Spread between a Dove nominal and the measured line (Dove error, retuning, temperature).
     pub nominal_sigma_cents: f64,
+    /// Shape of that spread, and its Student-t degrees of freedom (`matcher::NominalShape`).
+    pub nominal_shape: NominalShape,
+    pub nominal_t_nu: f64,
+    /// Share and width of a wide Gaussian mixed into the nominal term (mislisted or retuned bells).
+    pub nominal_outlier_weight: f64,
+    pub nominal_outlier_sigma_cents: f64,
+    /// Farthest line a nominal may claim, in `nominal_sigma_cents` (at least 3 outlier sigmas).
+    pub nominal_reach_sigmas: f64,
+    /// Prior that one bell of the ring, unknown which, is mislisted: its nominal is then scored with
+    /// a Gaussian of `ring_outlier_sigma_cents`, so one bad bell can't sink the ring. 0 turns it off.
+    pub ring_outlier_weight: f64,
+    pub ring_outlier_sigma_cents: f64,
     /// Search range and prior width of a global pitch offset (playback speed, resampling).
     pub max_shift_cents: f64,
     pub shift_sigma_cents: f64,
@@ -75,6 +98,13 @@ impl Default for MatchParams {
     fn default() -> Self {
         Self {
             nominal_sigma_cents: 5.0,
+            nominal_shape: NominalShape::Gaussian,
+            nominal_t_nu: 4.0,
+            nominal_outlier_weight: 0.0,
+            nominal_outlier_sigma_cents: 15.0,
+            nominal_reach_sigmas: 3.0,
+            ring_outlier_weight: 0.0,
+            ring_outlier_sigma_cents: 15.0,
             max_shift_cents: 40.0,
             shift_sigma_cents: 15.0,
             shift_core_weight: 0.7,

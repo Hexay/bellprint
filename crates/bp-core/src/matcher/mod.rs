@@ -1,12 +1,13 @@
 mod confidence;
 pub mod model;
+mod nominal;
 mod score;
 
 pub use confidence::{Confidence, HIGH_MARGIN_NATS, MEDIUM_MARGIN_NATS, top_confidence};
 use crate::audio::spectrum::Peak;
 use crate::catalog::{Catalog, Ring};
 use crate::geo::Region;
-pub use model::MatchParams;
+pub use model::{MatchParams, NominalShape};
 use rayon::prelude::*;
 use score::{Lines, RingModel, RingScore, score_ring};
 use serde::Serialize;
