@@ -30,6 +30,13 @@ Bands often ring the back 8 of 10 or 12, or 6 of 8. `score_ring_or_subset` also 
 run that drops up to 4 bells from the front or back (keeping ≥ 5), charged `subset_log_prior` = −3. Sim
 rings are complete, so sim is neutral to it; on the corpus it adds top-1 and top-5 (`experiments/no_subsets.toml`).
 
+Under the Student-t default, subsets still help on simulated 6-of-8 (12 complete 8s, every 142nd, seeds
+1 and 7; rank with/without subsets). Clean sim: back 6 better in 6/24 (e.g. 4 → 29, 1 → 8, 30 → 66),
+worse in 0; front 6 better in 2/24, worse in 0. Default sim: back 6 better in 6/24 (27 → out, 11 → 67,
+2 → 53), worse in 3 (by 1–2 ranks, all below rank 60); front 6 better in 7/24 (14 → 41), worse in 1
+(3 → 2). The Gaussian term gains more in the same cases. Guarded by
+`default_matcher_needs_subsets_for_six_of_eight` (tests/pipeline.rs).
+
 Prior re-check (2026-11, replay on `runs/ab-prom3` caches; sim top-1/top-5, corpus top-1/5/20) — **keep −3**:
 
 | prior | sim s1 | sim s2 | corpus |

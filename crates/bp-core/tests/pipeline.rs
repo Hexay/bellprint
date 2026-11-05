@@ -51,22 +51,47 @@ fn light_ring_with_trebles_above_the_band_still_ranks() {
     assert!(rank.is_some_and(|r| r <= 3), "{} {:?}: rank {rank:?}", ring.place, ring.nominals);
 }
 
+fn eight(index: usize) -> &'static bp_core::catalog::Ring {
+    catalog().rings.iter().filter(|r| r.nominals.len() == 8 && r.complete()).nth(index).unwrap()
+}
+
+fn bells(ring: &bp_core::catalog::Ring, keep: std::ops::Range<usize>) -> bp_core::catalog::Ring {
+    bp_core::catalog::Ring {
+        nominals: ring.nominals[keep.clone()].to_vec(),
+        cast_years: ring.cast_years[keep.clone()].to_vec(),
+        optional: ring.optional[keep].to_vec(),
+        ..ring.clone()
+    }
+}
+
+fn rank_of(audio: &bp_core::audio::Audio, tower_id: u32, matcher: MatchParams) -> usize {
+    let report = locate_audio(catalog(), audio, &LocateOptions { top: 50, matcher, ..Default::default() });
+    tower_rank(&report, tower_id).unwrap_or(usize::MAX)
+}
+
+fn no_subsets() -> MatchParams {
+    MatchParams { subset_log_prior: f64::NEG_INFINITY, ..Default::default() }
+}
+
+/// Fixtures picked from a sweep (research/matcher.md, Ring subsets) where the default matcher
+/// needs the subset to reach the top 3.
+#[test]
+fn default_matcher_needs_subsets_for_six_of_eight() {
+    for (index, keep, seed) in [(1420, 2..8, 1), (1420, 2..8, 7), (1420, 0..6, 7), (1278, 0..6, 7)] {
+        let ring = eight(index);
+        let (audio, _) = simulate(&bells(ring, keep.clone()), &clean(), seed);
+        let with = rank_of(&audio, ring.tower_id, MatchParams::default());
+        let without = rank_of(&audio, ring.tower_id, no_subsets());
+        assert!(with <= 3 && with < without, "{} {keep:?} seed {seed}: rank {with} with subsets, {without} without", ring.place);
+    }
+}
+
 /// The back 6 of a common 8 is shared by many 6-bell rings, so only a clear rise is asked for.
 #[test]
 fn ringing_the_back_six_of_eight_still_finds_the_eight() {
-    let c = catalog();
-    let ring = c.rings.iter().find(|r| r.nominals.len() == 8 && r.complete()).unwrap();
-    let back6 = bp_core::catalog::Ring {
-        nominals: ring.nominals[2..].to_vec(),
-        cast_years: ring.cast_years[2..].to_vec(),
-        optional: ring.optional[2..].to_vec(),
-        ..ring.clone()
-    };
-    let (audio, _) = simulate(&back6, &clean(), 7);
-    let rank = |matcher: MatchParams| {
-        let report = locate_audio(c, &audio, &LocateOptions { top: 50, matcher, ..Default::default() });
-        tower_rank(&report, ring.tower_id).unwrap_or(usize::MAX)
-    };
+    let ring = eight(0);
+    let (audio, _) = simulate(&bells(ring, 2..8), &clean(), 7);
+    let rank = |matcher: MatchParams| rank_of(&audio, ring.tower_id, matcher);
     // The heavy-tailed nominal term credits the silent trebles at chance lines, so the subset's effect
     // on rank shows only with the Gaussian term.
     let gaussian = MatchParams { nominal_shape: NominalShape::Gaussian, nominal_reach_sigmas: 3.0, ..Default::default() };
