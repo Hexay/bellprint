@@ -40,7 +40,7 @@ pub fn eval_sim(catalog: &Catalog, cfg: &SimEvalConfig, opts: &LocateOptions) ->
             let report = locate_audio(catalog, &audio, opts);
             let note = format!("speed {:+.0}c", truth.speed_cents);
             let id = format!("sim-{}-{seed}", ring.ring_id);
-            let clip = Clip::new(id, ring.tower_id, ring.nominals.len(), &report, note);
+            let clip = Clip { truth_hz: truth.true_nominals, ..Clip::new(id, ring.tower_id, ring.nominals.len(), &report, note) };
             (clip.case(&report.matches), clip)
         })
         .collect()

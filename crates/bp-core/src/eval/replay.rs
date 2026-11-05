@@ -17,12 +17,16 @@ pub struct Clip {
     pub band_hz: (f64, f64),
     /// (hz, prominence dB) per line.
     pub lines: Vec<(f64, f64)>,
+    /// Sim only: the nominals actually rendered (Dove error, retune and speed applied), for measuring
+    /// line precision against truth.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub truth_hz: Vec<f64>,
 }
 
 impl Clip {
     pub fn new(id: String, tower_id: u32, bells: usize, report: &Report, note: String) -> Self {
         let lines = report.peaks.iter().map(|p| (p.hz, p.prominence_db)).collect();
-        Self { id, tower_id, bells, note, band_hz: report.band_hz, lines }
+        Self { id, tower_id, bells, note, band_hz: report.band_hz, lines, truth_hz: Vec::new() }
     }
 
     pub fn peaks(&self) -> Vec<Peak> {
