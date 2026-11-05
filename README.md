@@ -9,7 +9,7 @@
 Work out which church tower you can hear in a recording, from the pitches of its bells.
 
 **Status: early research software.** On simulated recordings it puts the right tower first about seven times
-in ten; on real recordings, nearly one time in three. See [Accuracy](#accuracy).
+in ten; on real recordings, about one time in three. See [Accuracy](#accuracy).
 
 ## Why the whole ring
 
@@ -53,7 +53,8 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
    nominal, with tolerances in cents from published bell measurements ([research/acoustics.md](research/acoustics.md)).
    Bells cast from 1896, when true-harmonic tuning began, get much tighter hum and prime tolerances.
 3. **Match.** Score every Dove ring on how many of its nominals are present and how well its predicted
-   partials explain the observed lines, compared with chance. Bands often ring only the back or front bells
+   partials explain the observed lines, compared with chance; a nominal a little further off than Dove
+   lists still earns partial credit. Bands often ring only the back or front bells
    of a larger ring, so those subsets are scored too, at a small penalty, as is each ring without the semitone bells and extra
    treble that bands often leave out. One pitch shift is fitted per clip,
    with priors at the offsets that 44.1/48 kHz and 24/25 fps mix-ups produce, sharply peaked because most
@@ -61,8 +62,8 @@ cover Linux, macOS and Windows; from a checkout, `cargo run --release -p bp-cli 
 4. **Rank.** List candidate towers with relative probabilities and the top candidate's margin over the next.
    The probabilities are not calibrated: too cautious on clean audio, too confident on real recordings
    ([research/matcher.md](research/matcher.md)). Instead the top pick gets a coarse confidence from its
-   margin: **high** (≥ 2 nats) is right 98 % of the time on simulated recordings and 81 % on real ones,
-   **medium** (1–2) 76 % / 48 %, **low** (< 1) 37 % / 13 %. Thresholds were set on the simulation and
+   margin: **high** (≥ 2 nats) is right 96 % of the time on simulated recordings and 95 % on real ones,
+   **medium** (1–2) 80 % / 50 %, **low** (< 1) 36 % / 16 %. Thresholds were set on the simulation and
    the real-recording rates are held out ([research/matcher_twins.md](research/matcher_twins.md)).
 
 Two experimental options did worse than this default and stay opt-in: `--extraction blows` (keep only lines
@@ -73,7 +74,7 @@ that rise when a bell strikes) and `--auto-window` (analyse only the most bell-l
 | Benchmark | Setup | Right tower first | In top 5 |
 |---|---|---|---|
 | Simulated, 200 random Dove rings | 8 s of rounds, 10 dB SNR, distractor tones, ±8 c speed and ±3 c Dove error, 5 % of rings retuned, hum and prime spread by each bell's tuning era | **72 %** | 88 % |
-| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **47 / 141** | 68 / 141 |
+| Real recordings of 141 named towers ([data/corpus](data/corpus/README.md)) | Whole clips as published, no `--near` | **49 / 141** | 70 / 141 |
 
 - The simulator shares no code or constants with the matcher's bell model, but it is kinder than reality: no
   reverb, no automatic gain control, and ringing for the whole clip.
