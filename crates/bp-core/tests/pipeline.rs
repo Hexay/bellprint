@@ -1,6 +1,6 @@
 use bp_core::catalog::Catalog;
 use bp_core::locate::{LocateOptions, locate_audio, tower_rank};
-use bp_core::matcher::MatchParams;
+use bp_core::matcher::{MatchParams, NominalShape};
 use bp_core::sim::{SimParams, simulate};
 use std::sync::OnceLock;
 
@@ -67,9 +67,14 @@ fn ringing_the_back_six_of_eight_still_finds_the_eight() {
         let report = locate_audio(c, &audio, &LocateOptions { top: 50, matcher, ..Default::default() });
         tower_rank(&report, ring.tower_id).unwrap_or(usize::MAX)
     };
-    let with = rank(MatchParams::default());
-    let without = rank(MatchParams { subset_log_prior: f64::NEG_INFINITY, ..Default::default() });
+    // The heavy-tailed nominal term credits the silent trebles at chance lines, so the subset's effect
+    // on rank shows only with the Gaussian term.
+    let gaussian = MatchParams { nominal_shape: NominalShape::Gaussian, nominal_reach_sigmas: 3.0, ..Default::default() };
+    let with = rank(gaussian.clone());
+    let without = rank(MatchParams { subset_log_prior: f64::NEG_INFINITY, ..gaussian });
     assert!(with <= 15 && with < without, "{}: rank {with} with subsets, {without} without", ring.place);
+    let default = rank(MatchParams::default());
+    assert!(default <= 15, "{}: rank {default} with the default matcher", ring.place);
 }
 
 #[test]

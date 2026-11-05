@@ -1,4 +1,5 @@
 use super::model::{MatchParams, PARTIALS, cents, partial_tol, ratio_cents};
+use super::nominal::NominalPdf;
 use crate::audio::spectrum::Peak;
 
 /// Observed lines in cents, sorted, with strength in (0, 1].
@@ -30,19 +31,17 @@ impl Lines {
         }
     }
 
-    /// Best Gaussian pdf (per cent) of the offset to a line within 3 sigma of `x`, discounted only for
-    /// faint lines: real nominals are often just 10–12 dB above the floor. `lo` is the first line at or
-    /// above `x - 3 sigma`.
-    fn best_near(&self, lo: usize, x: f64, sigma: f64) -> f64 {
-        let norm = 1.0 / (sigma * std::f64::consts::TAU.sqrt());
+    /// Best pdf (per cent) of the offset to a line within `pdf.reach` of `x`, discounted only for faint
+    /// lines: real nominals are often just 10–12 dB above the floor. `lo` is the first line at or above
+    /// `x - pdf.reach`.
+    fn best_near(&self, lo: usize, x: f64, pdf: &NominalPdf) -> f64 {
         let mut best: f64 = 0.0;
         for i in lo..self.cents.len() {
             let d = self.cents[i] - x;
-            if d > 3.0 * sigma {
+            if d > pdf.reach {
                 break;
             }
-            let s = (self.strength[i] / 0.4).min(1.0);
-            best = best.max(s * norm * (-0.5 * (d / sigma).powi(2)).exp());
+            best = best.max(pdf.scaled((self.strength[i] / 0.4).min(1.0), d));
         }
         best
     }
@@ -115,7 +114,7 @@ pub(super) struct RingScore {
 /// can ride each rising run of the grid; each shift still sums its nominals in order, so the floats
 /// are bit-identical to a shift-outer loop.
 fn bell_terms(m: &RingModel, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams) -> (Vec<f64>, Vec<usize>) {
-    let (sigma, half) = (p.nominal_sigma_cents, DENSITY_HALF_CENTS);
+    let (pdf, half) = (NominalPdf::new(p), DENSITY_HALF_CENTS);
     let mut total = vec![0.0; grid.len()];
     let mut heard = vec![0usize; grid.len()];
     for (&n, &ph) in m.nominals.iter().zip(&m.heard) {
@@ -133,8 +132,8 @@ fn bell_terms(m: &RingModel, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams
             if x < lines.band.0 || x > lines.band.1 {
                 continue;
             }
-            near = advance(&lines.cents, near, |&c| c < x - 3.0 * sigma);
-            let best = lines.best_near(near, x, sigma);
+            near = advance(&lines.cents, near, |&c| c < x - pdf.reach);
+            let best = lines.best_near(near, x, &pdf);
             if best == 0.0 {
                 total[g] += miss;
                 continue;
