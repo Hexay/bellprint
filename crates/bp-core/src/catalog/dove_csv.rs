@@ -65,22 +65,30 @@ fn is_ring_bell(role: &str) -> bool {
     role.chars().next().is_some_and(|c| c.is_ascii_digit())
 }
 
+/// Semitone bells ("6b", "2#") and an extra treble ("0"): hung beside the diatonic ring, which bands
+/// usually ring without them.
+fn is_optional_bell(role: &str) -> bool {
+    role == "0" || role.ends_with(['b', '#'])
+}
+
 /// Dove writes sizes like "3 U/R" for unringable rings.
 fn leading_int(s: &str) -> Option<u32> {
     let digits: String = s.trim().chars().take_while(|c| c.is_ascii_digit()).collect();
     digits.parse().ok()
 }
 
-/// (nominal Hz, cast year) of every ring bell, by ring.
-fn bells_by_ring(bells_csv: &[u8]) -> HashMap<u32, Vec<(f64, Option<u16>)>> {
-    let mut out: HashMap<u32, Vec<(f64, Option<u16>)>> = HashMap::new();
+type Bell = (f64, Option<u16>, bool);
+
+/// (nominal Hz, cast year, optional) of every ring bell, by ring.
+fn bells_by_ring(bells_csv: &[u8]) -> HashMap<u32, Vec<Bell>> {
+    let mut out: HashMap<u32, Vec<Bell>> = HashMap::new();
     for row in reader(bells_csv).deserialize::<BellRow>() {
         let Ok(row) = row else { continue };
         if let (Some(id), Some(hz)) = (row.ring_id, row.nominal)
             && is_ring_bell(&row.role)
             && hz > 0.0
         {
-            out.entry(id).or_default().push((hz, cast_year(&row.cast)));
+            out.entry(id).or_default().push((hz, cast_year(&row.cast), is_optional_bell(&row.role)));
         }
     }
     out
@@ -98,13 +106,15 @@ pub(super) fn parse_rings(dove_csv: &[u8], bells_csv: &[u8]) -> Vec<Ring> {
         if b.is_empty()
             && let Some(t) = row.tenor_hz.filter(|t| *t > 0.0)
         {
-            b.push((t, None));
+            b.push((t, None, false));
         }
         if b.is_empty() {
             continue;
         }
         b.sort_by(|x, y| y.0.total_cmp(&x.0));
-        let (hz, cast_years): (Vec<f64>, _) = b.into_iter().unzip();
+        let hz: Vec<f64> = b.iter().map(|x| x.0).collect();
+        let cast_years = b.iter().map(|x| x.1).collect();
+        let optional = b.iter().map(|x| x.2).collect();
         rings.push(Ring {
             ring_id: row.ring_id,
             tower_id: row.tower_id,
@@ -117,6 +127,7 @@ pub(super) fn parse_rings(dove_csv: &[u8], bells_csv: &[u8]) -> Vec<Ring> {
             bells: leading_int(&row.bells).unwrap_or(hz.len() as u32),
             nominals: hz,
             cast_years,
+            optional,
         });
     }
     rings

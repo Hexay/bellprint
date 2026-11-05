@@ -44,6 +44,49 @@ corpus clips ring a modelled front/back subset (stepney-stedman, ia-coventry-cat
 bbc-st-clement-danes, bbc-rochdale-st-chad; 7 counting B2 partial rings), spread over ≤ 8 subsets per ring:
 ln(0.03/8) ≈ −5.6 (ln(0.05/8) ≈ −5.1). −3 is already generous; the +2 at −1.5 is clip-specific.
 
+## Optional bells and the first-pass shortlist (2026-11-05, on main fc76703)
+Dove's `bells.csv` "Bell Role" marks semitone bells with a `b` / `#` suffix ("6b", "2#", "5#"; 130 bells)
+and an extra treble as "0" (31). They sit in 106 and 29 full-circle/lightweight rings. "NcM" roles
+(18 rings) are ring bell N doubling as carillon bell M, not extras. Bands usually ring the diatonic ring
+without them, and every unheard one costs ln(1 − 0.7). Subsets only drop from the ends, so an interior
+semitone is always charged. 27 of 141 corpus clips come from such towers (10 already top-1). Sim rings have them in 6 (s1) and 4 (s2) clips,
+and the sim rings every listed bell, extras included. That is a slight bias against both levers below.
+Not changed, since the sim stays independent of the matcher.
+
+Two levers, both replayed on main's caches (`eval --out` + `replay`; default replay is bit-identical):
+
+| variant | sim s1 | sim s2 | corpus | corpus +gained / −lost top-1 |
+|---|---|---|---|---|
+| main | 144/177 | 129/169 | 46/66/80 | – |
+| `p_optional_heard` 0.3 | 144/177 | 129/169 | 46/66/81 | +ia-worcester-cathedral-remembrance / −bbc-st-sepulchre |
+| `p_optional_heard` 0.1 / ≈0 | 144/177 | 129/169 | 46/66/82 | same pair |
+| `without_optional_log_prior` 0 | 143/177 | 128/169 | 46/67/81 | +exeter-cathedral-practice / −bbc-st-sepulchre |
+| −0.25 | 143/177 | 129/169 | 47/67/81 | +exeter-cathedral-practice |
+| **−0.5 (default)** | **143/177** | **129/169** | **47/68/82** | **+exeter-cathedral-practice** |
+| −0.75 | 144/177 | 129/169 | 46/68/82 | – |
+| −1 | 144/177 | 129/169 | 46/67/82 | – |
+| −2 | 144/177 | 129/169 | 46/66/81 | – |
+
+- `without_optional_log_prior` also scores each ring with its optional bells removed (subsets still
+  apply), charged the prior. At −0.5, confirmed by a full eval, the s1 loss (sim-828-124) is a rival,
+  Rothwell (0, 4b), gaining from the drop. The true ring doesn't lose. The gain is fragile:
+  exeter-cathedral-practice wins by 0.07 nats. Worcester ×2 rise to rank 2 (25 → 2), winchester 10 → 5.
+  `experiments/no_optional_drop.toml` turns it off.
+- `p_optional_heard` (soft: an optional bell's miss costs ln(1 − q)) swaps one top-1 for another at every q.
+  Not adopted (`None`).
+- **The B1 targets don't move.** tewkesbury, carlisle and wakefield stay outside the top 50 under every
+  variant, even combined with an unlimited shortlist. They also lose non-optional bells (tewkesbury 6 and
+  10, wakefield 11, carlisle 3), so the semitone charge isn't what sinks them.
+
+First-pass cut (coarse bell-terms-only score, top `shortlist` = 400): cases where the true ring is
+cut but its full score would rank in the top 50 (unlimited-shortlist replay vs main):
+s1 2/200 (sim-467-108 → 4, sim-3821-59 → 14), s2 2/200 (sim-17846-40 → 9; sim-4464-107 1 → 2 because a
+rival enters), corpus 1/141 (giggleswick → 17 at 800, 18 unlimited). With 800, 1600 or unlimited:
+s1 144/178, s2 128/169 (−sim-4464-107), corpus 46/66/81 (sc-westbury-muffled 8 → 14–17, three ranks
+down past 20). None gains a top-1. Replay time per eval at 4 threads is about 80 s at 400, 120–200 s at
+800, 180–250 s at 1600 and 580–680 s unlimited (a shared box, so the times are noisy). **Keep 400**. A
+better first-pass score isn't worth building for one top-20 clip.
+
 ## Remaining misses (2.5 kHz band, 4 dB lines, 113 misses)
 Per-miss decomposition (true ring vs winner at their best shifts) over the 64 misses with ≥ 75 % of true
 nominals within 8 c of a line:

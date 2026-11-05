@@ -50,6 +50,11 @@ pub struct MatchParams {
     /// (research/matcher.md). Each nominal scores ln(1 - p + p * LR), LR = Gaussian pdf of its
     /// nearest-line offset / local line density.
     pub p_bell_heard: f64,
+    /// `p_bell_heard` of semitone bells and extra trebles (Dove "6b", "2#", "0"), which bands often
+    /// leave out; `None` treats them like any bell.
+    pub p_optional_heard: Option<f64>,
+    /// Also score each ring without its optional bells, charged this log prior; `None` doesn't.
+    pub without_optional_log_prior: Option<f64>,
     /// Prior share of observed lines that come from something other than the bells.
     pub background_share: f64,
     /// Width of the searched band in cents: the background line density is uniform over it.
@@ -81,6 +86,8 @@ impl Default for MatchParams {
             shift_core_sigma_cents: 6.0,
             resample_shifts: true,
             p_bell_heard: 0.7,
+            p_optional_heard: None,
+            without_optional_log_prior: Some(-0.5),
             background_share: 0.5,
             band_cents: 8500.0,
             full_strength_db: 24.0,
