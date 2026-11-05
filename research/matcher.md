@@ -87,6 +87,51 @@ down past 20). None gains a top-1. Replay time per eval at 4 threads is about 80
 800, 180–250 s at 1600 and 580–680 s unlimited (a shared box, so the times are noisy). **Keep 400**. A
 better first-pass score isn't worth building for one top-20 clip.
 
+## Class C shift misses: prior, not grid, and not recoverable (2026-11-05, on main f9b7871)
+The four C clips (miss_triage.md), from `locate --json --top 400` with the default prior and a flat one
+(`shift_core_weight` 0, `shift_sigma_cents` 1e9). "Prior cost" is what the default prior charges at the
+true shift relative to 0 c:
+
+| clip | true shift | prior cost | gap to winner | gap − cost | rank (flat prior) |
+|---|---|---|---|---|---|
+| bbc-south-lopham | +15 | 2.07 | 3.40 | 1.33 | 44 (14) |
+| alfriston | −12.5 | 1.61 | 4.39 | 2.78 | 91 (92) |
+| bbc-brixham | +25 | 3.31 | 6.22 | 2.91 | 60 (22) |
+| bbc-westminster-abbey | −22.5 | 3.03 | 4.92 | 1.89 | 168 (75) |
+
+- **Not the grid.** Its step is σ/4 = 1.25 c. Half a step off costs ≤ 0.008 nats per nominal, and every
+  true shift lands on a grid point.
+- **The prior penalises them, but it isn't why they lose.** Even with its whole prior cost removed, each
+  true ring still trails by 1.3–2.9 nats. A flat prior lifts the rivals too: winners move to +22.5, +35
+  and +40 c, and no clip reaches the top 10.
+- **Opposite risk.** A flat prior gives corpus 32/51/70 (+0 / −15 top-1) and sim 125 / 114. Of the 47
+  corpus hits, 45 fit within 10 c of a known shift and none beyond 12.5 c. The tail is real but thin.
+- **Source.** `tools/triage/shifts.py`, on an eval's cases.json (`true_shift_cents`, `true_gap`), shows
+  BBC Sound Effects clips at a median |offset| of 5.6 c (4 of 20 with the true ring ranked ≥ 10 c out).
+  Every other source has a median of 1.3–3.8 c (1 of 68 ≥ 10 c). Three of the four C clips are BBC
+  CD transfers of older recordings (the same library's Rochdale is dated 1974, Canterbury 1981), which
+  fits tape-speed error. The matcher can't see the source, though. Alfriston (Freesound, "cut to loop;
+  inside church") has no evidence of a speed error. Its note says 5-bell changes on the 6, which the
+  subset rule already scores.
+- bbc-lostwithiel (rank 3, −11.25 c, just under the C cut) trails by only 0.32 nats, less than its prior
+  cost. Its winner, Cury, sits at +21 c, so cheaper tails help the rival more: the gap widens to
+  0.57–1.85 nats under every variant below.
+
+Replayed on main's `eval --out` caches (the default replay is bit-identical); sim top-1/top-5, corpus
+top-1/5/20:
+
+| variant | sim s1 | sim s2 | corpus | corpus +gained / −lost top-1 |
+|---|---|---|---|---|
+| main | 143/177 | 129/169 | 47/68/82 | – |
+| `shift_sigma_cents` 25 | 143/178 | 130/171 | 47/68/82 | – |
+| `shift_core_weight` 0.5 | 145/179 | 129/169 | 47/65/82 | – |
+| both | 144/179 | 128/172 | 45/63/81 | −london-bow-stedman, −witney |
+| flat | 125/163 | 114/159 | 32/51/70 | −15 (bradpole, bow-stedman, witney, st-sepulchre, …) |
+
+None raises corpus top-1, so **keep the prior** (core weight 0.7 at σ 6, broad σ 15). These clips need
+more evidence for the true ring than for its rivals, which the shift prior can't give. A source-aware
+prior (wider for archival transfers) would need metadata that `locate` doesn't have.
+
 ## Remaining misses (2.5 kHz band, 4 dB lines, 113 misses)
 Per-miss decomposition (true ring vs winner at their best shifts) over the 64 misses with ≥ 75 % of true
 nominals within 8 c of a line:

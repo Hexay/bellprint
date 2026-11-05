@@ -35,6 +35,7 @@ impl Clip {
 
     pub fn case(&self, matches: &[Match]) -> Case {
         let top = matches.first();
+        let truth = matches.iter().find(|m| m.ring.tower_id == self.tower_id);
         Case {
             id: self.id.clone(),
             tower_id: self.tower_id,
@@ -44,6 +45,9 @@ impl Clip {
             top_place: top.map_or(String::new(), |m| format!("{} ({})", m.ring.place, m.ring.dedication)),
             top_probability: top.map_or(0.0, |m| m.probability),
             top_margin: top.map_or(0.0, |m| m.margin),
+            top_shift_cents: top.map(|m| m.shift_cents),
+            true_shift_cents: truth.map(|m| m.shift_cents),
+            true_gap: top.zip(truth).map(|(t, m)| t.score - m.score),
             confidence: top_confidence(matches),
             peaks: self.lines.len(),
             note: self.note.clone(),

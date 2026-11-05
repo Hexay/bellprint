@@ -21,6 +21,10 @@ pub struct Case {
     pub top_place: String,
     pub top_probability: f64,
     pub top_margin: f64,
+    pub top_shift_cents: Option<f64>,
+    /// The true ring's fitted shift and its score deficit to the top pick, when it is in the list.
+    pub true_shift_cents: Option<f64>,
+    pub true_gap: Option<f64>,
     pub confidence: Option<Confidence>,
     pub peaks: usize,
     pub note: String,

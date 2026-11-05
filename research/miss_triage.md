@@ -60,7 +60,9 @@ Levers that recover **nothing** (corpus top-1 unchanged or worse):
 
 - Shift prior: core σc 4 (+0 / −0, sim 135), core weight 0.9 (+0 / −0, sim 138). C clips trail by 1.3–3.0
   nats beyond their whole prior cost, so no prior closes them; earlier broad floors also failed
-  (matcher.md).
+  (matcher.md). Re-checked on f9b7871 with a flat prior, broad σ 25 and core weight 0.5: the grid is
+  fine, the gap exceeds the prior cost by 1.3–2.9 nats, and a flat prior loses 15 hits (matcher.md
+  "Class C shift misses").
 - Longer subsets, `max_bells_dropped` 4 → 10: B2 clips stay outside the top 50.
 - Optional semitone/extra bells (+1 corpus top-1, adopted, but no B1 clip moves) and a larger first-pass
   shortlist (+0): matcher.md "Optional bells and the first-pass shortlist".
@@ -83,4 +85,5 @@ by the classes above; see `git log -p research/miss_triage.md` before 2026-11-04
 
 Regenerate: `tools/triage/locate_misses.sh <bin> <cases.json> <out>` writes the per-miss dumps;
 `python3 -I tools/triage/triage.py`, `classify.py` (class rules, incl. the hand-set A3 / B2 lists),
-`near.py` and `levers.py` (on `replay --out` dirs) print the tables.
+`near.py` and `levers.py` (on `replay --out` dirs) print the tables; `shifts.py <cases.json>` the true
+rings' fitted shifts by hit/miss and source.
