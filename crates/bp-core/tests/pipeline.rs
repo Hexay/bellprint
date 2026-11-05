@@ -59,6 +59,7 @@ fn ringing_the_back_six_of_eight_still_finds_the_eight() {
     let back6 = bp_core::catalog::Ring {
         nominals: ring.nominals[2..].to_vec(),
         cast_years: ring.cast_years[2..].to_vec(),
+        optional: ring.optional[2..].to_vec(),
         ..ring.clone()
     };
     let (audio, _) = simulate(&back6, &clean(), 7);
@@ -69,4 +70,32 @@ fn ringing_the_back_six_of_eight_still_finds_the_eight() {
     let with = rank(MatchParams::default());
     let without = rank(MatchParams { subset_log_prior: f64::NEG_INFINITY, ..Default::default() });
     assert!(with <= 15 && with < without, "{}: rank {with} with subsets, {without} without", ring.place);
+}
+
+#[test]
+fn semitone_and_extra_treble_are_optional() {
+    let r = catalog().ring(4173).expect("Wakefield ring");
+    let marked: Vec<f64> = r.nominals.iter().zip(&r.optional).filter(|x| *x.1).map(|x| *x.0).collect();
+    assert_eq!(marked, vec![1735.0, 920.5]);
+}
+
+#[test]
+fn ringing_without_the_semitone_still_finds_the_ring() {
+    let c = catalog();
+    let ring = c.ring(4173).expect("Wakefield ring");
+    let keep: Vec<usize> = (0..ring.nominals.len()).filter(|&i| !ring.optional[i]).collect();
+    let diatonic = bp_core::catalog::Ring {
+        nominals: keep.iter().map(|&i| ring.nominals[i]).collect(),
+        cast_years: keep.iter().map(|&i| ring.cast_years[i]).collect(),
+        optional: vec![false; keep.len()],
+        ..ring.clone()
+    };
+    let (audio, _) = simulate(&diatonic, &clean(), 7);
+    let rank = |matcher: MatchParams| {
+        let report = locate_audio(c, &audio, &LocateOptions { top: 50, matcher, ..Default::default() });
+        tower_rank(&report, ring.tower_id).unwrap_or(usize::MAX)
+    };
+    let with = rank(MatchParams::default());
+    let without = rank(MatchParams { without_optional_log_prior: None, ..Default::default() });
+    assert!(with == 1 && with <= without, "rank {with} with the drop, {without} without");
 }

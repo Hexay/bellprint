@@ -59,15 +59,21 @@ const DENSITY_HALF_CENTS: f64 = 300.0;
 /// A ring prepared for scoring: nominals and every predicted partial, in cents.
 pub(super) struct RingModel {
     nominals: Vec<f64>,
+    /// Probability each nominal is heard: `p_bell_heard`, or `p_optional_heard` for optional bells.
+    heard: Vec<f64>,
     /// (cents, sigma) sorted by cents.
     partials: Vec<(f64, f64)>,
     max_sigma: f64,
 }
 
 impl RingModel {
-    /// `cast_years` runs parallel to `nominals_hz`.
-    pub fn new(nominals_hz: &[f64], cast_years: &[Option<u16>], p: &MatchParams) -> Self {
+    /// `cast_years` and `optional` run parallel to `nominals_hz`.
+    pub fn new(nominals_hz: &[f64], cast_years: &[Option<u16>], optional: &[bool], p: &MatchParams) -> Self {
         let nominals: Vec<f64> = nominals_hz.iter().map(|&h| cents(h)).collect();
+        let heard = optional
+            .iter()
+            .map(|&o| if o { p.p_optional_heard.unwrap_or(p.p_bell_heard) } else { p.p_bell_heard })
+            .collect();
         let mut partials: Vec<(f64, f64)> = nominals
             .iter()
             .zip(cast_years)
@@ -79,7 +85,7 @@ impl RingModel {
             .collect();
         partials.sort_by(|a, b| a.0.total_cmp(&b.0));
         let max_sigma = partials.iter().map(|x| x.1).fold(0.0, f64::max);
-        Self { nominals, partials, max_sigma }
+        Self { nominals, heard, partials, max_sigma }
     }
 
     /// Density (per cent) of this ring's partials at `y` (already unshifted): an equal-weight Gaussian
@@ -110,11 +116,11 @@ pub(super) struct RingScore {
 /// are bit-identical to a shift-outer loop.
 fn bell_terms(m: &RingModel, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams) -> (Vec<f64>, Vec<usize>) {
     let (sigma, half) = (p.nominal_sigma_cents, DENSITY_HALF_CENTS);
-    // ln(1 - p + p * 0) exactly: the term for a nominal with no line in reach.
-    let miss = (1.0 - p.p_bell_heard).ln();
     let mut total = vec![0.0; grid.len()];
     let mut heard = vec![0usize; grid.len()];
-    for &n in &m.nominals {
+    for (&n, &ph) in m.nominals.iter().zip(&m.heard) {
+        // ln(1 - p + p * 0) exactly: the term for a nominal with no line in reach.
+        let miss = (1.0 - ph).ln();
         let (mut near, mut below, mut upto) = (0, 0, 0);
         let mut prev = f64::INFINITY;
         for (g, &(shift, _)) in grid.iter().enumerate() {
@@ -138,7 +144,7 @@ fn bell_terms(m: &RingModel, lines: &Lines, grid: &[(f64, f64)], p: &MatchParams
             upto = advance(&lines.cents, upto, |&c| c <= x + half);
             let lr = best / line_density(below, upto, half);
             heard[g] += usize::from(lr > 1.0);
-            total[g] += (1.0 - p.p_bell_heard + p.p_bell_heard * lr).ln();
+            total[g] += (1.0 - ph + ph * lr).ln();
         }
     }
     (total, heard)
