@@ -80,4 +80,34 @@ confidence"); ranking is untouched (sim and corpus `cases.json` ranks identical 
   on equal temperament (no derived values). Whole-Hz rounding is SD 500 / f c (≤ 1.7 c above 300 Hz),
   well inside σ 5; not worth a per-bell width.
 
+## Line precision (2026-11-05): not what separates twins
+Hypothesis: class D twins (miss_triage.md) would separate with more precise line frequencies. Baseline main
+870ee77: sim s1/s2 top-1 144 / 129, corpus 46 / 66 / 80. Sim clips now save the rendered nominals
+(`Clip::truth_hz`, written by `eval-sim --out`), so extraction can be scored against truth.
+
+| measure (cents, median / p80 / p95) | value |
+|---|---|
+| Parabolic-on-dB bias, Hann window, clean tone (theory, worst sub-bin offset) | ≤ 0.12 at 300 Hz, ≤ 0.04 at 1 kHz |
+| sim: line − rendered nominal (n 2567, s1+s2) | 0.46 / 0.90 / 1.4; signed −0.5 (doublet centroid) |
+| sim: line − Dove at the clip's shift | 1.65 / 3.7 / 6.0 (the sim's 3 c Dove error) |
+| corpus: line − Dove at refit shift, lines ≥ 60 % present (112 clips) | 2.0 / 5.0 / 7.9 |
+| same, by prominence 3–6 / 6–12 / 12–24 / ≥ 24 dB | median 2.4 / 2.0 / 2.0 / 1.9 |
+| corpus: same ring, two recordings, line − line (8 rings, 187 bells) | 1.56 / 5.0 / 9.4 |
+| D clips (32): line − Dove at the matcher's true-ring shift | 2.3 / 5.2 / 11 |
+| D clips: winner − true predicted nominal, shared bells (241) | 2.3 / 4.9 / 8.6; 47 % within 2 c |
+
+- Extraction is ~10× tighter than σ 5 on sim, and corpus error does not fall with prominence, so it is
+  not SNR-limited. Two recordings of a ring agree to ~1.1 c each (1.56 / √2); the rest of the 2 c to
+  Dove (~1.7 c median) is Dove's figure against the bell as it sounds. Twin gaps are the same size as
+  that Dove term: no extraction can split them. On shared D bells the nearest line is nearer the winner
+  in 140 of 240.
+- **Oracle replays (sim, baseline clips.json).** Line nearest each rendered nominal moved onto it (zero
+  extraction error): 136 / 131 (−8 / +2). Moved onto Dove × speed (zero Dove error): 176 / 166. The sim
+  ceiling is Dove error, not line precision.
+- **Hann ratio estimator** (Grandke, `2(c − a)/(a + 2b + c)` on magnitudes, exact for one tone): sim
+  144 / 130, corpus 45 / 65 / 82. Lost bbc-st-sepulchre, gained none; D ranks 3 up, 10 down. Sim s1 error
+  0.48 c vs 0.47 (no better): doublets and neighbouring lines, not window bias, set the residual. Not kept.
+  Zero-padded refinement converges on the same exact-tone estimate, so it was not run.
+- **Narrower σ** not tried: precision did not improve, the precondition for it.
+
 Regenerate: scripts outside the repo, the procedure above on `replay` output and Dove `bells.csv`.
